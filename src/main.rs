@@ -16,7 +16,7 @@ fn main() {
         .author(crate_authors!())
         .about("Rm ImProved
 Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
-        .arg(Arg::with_name("TARGET")
+        .arg(Arg::with_name("SOURCE")
             .help("File or directory to remove")
             .required(true)
             .multiple(true)
@@ -29,7 +29,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     let graveyard: &Path = Path::new(matches.value_of("graveyard")
         .unwrap_or(GRAVEYARD));
-    let sources: clap::Values = matches.values_of("TARGET").unwrap();
+    let sources: clap::Values = matches.values_of("SOURCE").unwrap();
 
     for source in sources {
         send_to_graveyard(source, graveyard);
@@ -37,7 +37,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 }
 
 fn send_to_graveyard(source: &str, graveyard: &Path) {
-    let mut fullpath: PathBuf = current_dir().expect("Does current dir exist?");
+    let mut fullpath: PathBuf = current_dir().expect("Current dir error");
     fullpath.push(Path::new(source));
     let parent: &Path = fullpath.parent().expect("Trying to delete / ?");
     let dest: PathBuf = graveyard.join(parent.strip_prefix("/").unwrap());
