@@ -54,6 +54,9 @@ fn send_to_graveyard(source: &str, graveyard: &Path) -> std::io::Result<()> {
         }
     };
 
+    let parent: &Path = dest.parent().expect("Trying to delete / ?");
+    fs::create_dir_all(parent).expect("Failed to create grave path");
+
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
     if let Ok(_) = fs::rename(&fullpath, &dest) {
@@ -62,21 +65,18 @@ fn send_to_graveyard(source: &str, graveyard: &Path) -> std::io::Result<()> {
 
     // If that didn't work, then copy and rm.
     if fullpath.is_dir() {
-        fs::create_dir_all(&dest).expect("Failed to create grave path");
         for entry in WalkDir::new(source) {
             let entry = entry.expect("Failed to open file in source dir");
             let path = entry.path();
             if path.is_dir() {
-                println!("{}", dest.join(path).display());
-                fs::create_dir(dest.join(path)).expect("Copy dir failed");
+                println!("{}", parent.join(path).display());
+                fs::create_dir(parent.join(path)).expect("Copy dir failed");
             } else {
-                fs::copy(path, dest.join(path)).expect("Copy file failed");
+                fs::copy(path, parent.join(path)).expect("Copy file failed");
             }
         }
         fs::remove_dir_all(&fullpath).expect("Failed to remove source dir");
     } else {
-        let parent: &Path = dest.parent().expect("Trying to delete / ?");
-        fs::create_dir_all(parent).expect("Failed to create grave path");
         try!(fs::copy(&fullpath, &dest));
         try!(fs::remove_file(source));
     }
