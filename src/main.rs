@@ -59,7 +59,7 @@ fn send_to_graveyard(source: &str, graveyard: &Path) -> std::io::Result<()> {
 
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
-    if let Ok(_) = fs::rename(&fullpath, &dest) {
+    if let Ok(_) = fs::rename(source, &dest) {
         return Ok(());
     }
 
@@ -75,9 +75,9 @@ fn send_to_graveyard(source: &str, graveyard: &Path) -> std::io::Result<()> {
                 fs::copy(path, parent.join(path)).expect("Copy file failed");
             }
         }
-        fs::remove_dir_all(&fullpath).expect("Failed to remove source dir");
+        fs::remove_dir_all(source).expect("Failed to remove source dir");
     } else {
-        try!(fs::copy(&fullpath, &dest));
+        try!(fs::copy(source, &dest));
         try!(fs::remove_file(source));
     }
 
