@@ -39,7 +39,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     for source in sources {
         if let Err(e) = bury(source, &cwd, graveyard) {
-            println!("ERROR: {}", e);
+            println!("ERROR: {}, {}", e, source);
         }
     }
 }
@@ -77,11 +77,11 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
                 .expect("Failed to descend into directory");
             if path.is_dir() {
                 // println!("Creating {}", dest.join(path).display());
-                fs::create_dir(dest.join(path)).expect("Copy dir failed");
+                try!(fs::create_dir(dest.join(path)));
             } else {
                 // println!("Copying file {}", path.display());
                 // println!("to {}", dest.join(orphan).display());
-                fs::copy(path, dest.join(orphan)).expect("Copy file failed");
+                try!(fs::copy(path, dest.join(orphan)));
             }
         }
         fs::remove_dir_all(source).expect("Failed to remove source dir");
