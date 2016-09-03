@@ -31,31 +31,36 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     let graveyard: &Path = Path::new(matches.value_of("graveyard")
         .unwrap_or(GRAVEYARD));
     let sources: clap::Values = matches.values_of("SOURCE").unwrap();
+    let cwd: PathBuf = current_dir().expect("Error getting current directory");
+    if cwd.starts_with(graveyard) {
+        println!("You should use rm to delete files in the graveyard.");
+        return;
+    }
 
     for source in sources {
-        if let Err(e) = send_to_graveyard(source, graveyard) {
+        if let Err(e) = bury(source, &cwd, graveyard) {
             println!("ERROR: {}", e);
         }
     }
 }
 
-fn send_to_graveyard(source: &str, graveyard: &Path) -> std::io::Result<()> {
-    let cwd: PathBuf = current_dir().expect("Error getting current directory");
+fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
+
     let fullpath: PathBuf = cwd.join(Path::new(source));
     let dest: PathBuf = {
         // Can't join absolute paths, so we need to strip the leading "/"
         let grave = graveyard.join(fullpath.strip_prefix("/").unwrap());
         // Avoid a name conflict if necessary.
         if grave.exists() {
+            // println!("found name conflict {}", grave.display());
             numbered_rename(&grave)
-        }
-        else {
+        } else {
             grave
         }
     };
+    // println!("dest is {}", dest.display());
 
-    let parent: &Path = dest.parent().expect("Trying to delete / ?");
-    fs::create_dir_all(parent).expect("Failed to create grave path");
+    fs::create_dir_all(&dest).expect("Failed to create grave path");
 
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
@@ -67,12 +72,16 @@ fn send_to_graveyard(source: &str, graveyard: &Path) -> std::io::Result<()> {
     if fullpath.is_dir() {
         for entry in WalkDir::new(source) {
             let entry = entry.expect("Failed to open file in source dir");
-            let path = entry.path();
+            let path: &Path = entry.path();
+            let orphan: &Path = path.strip_prefix(path.parent().unwrap())
+                .expect("Failed to descend into directory");
             if path.is_dir() {
-                println!("{}", parent.join(path).display());
-                fs::create_dir(parent.join(path)).expect("Copy dir failed");
+                // println!("Creating {}", dest.join(path).display());
+                fs::create_dir(dest.join(path)).expect("Copy dir failed");
             } else {
-                fs::copy(path, parent.join(path)).expect("Copy file failed");
+                // println!("Copying file {}", path.display());
+                // println!("to {}", dest.join(orphan).display());
+                fs::copy(path, dest.join(orphan)).expect("Copy file failed");
             }
         }
         fs::remove_dir_all(source).expect("Failed to remove source dir");
