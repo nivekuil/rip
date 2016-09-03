@@ -8,6 +8,10 @@ No data is overwritten.  If files that share the same path are deleted, they wil
 If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you could alias =rip= to =rip --graveyard ~/.local/share/Trash=.
 This can be a good idea because the graveyard is in /tmp by default, which can quickly fill up your RAM if /tmp is mounted as tmpfs.  It's also slower than moving files within the same filesystem.
 
+** Installation
+Get a binary release or clone the repository and run =cargo build=.
+
+** Usage
 #+BEGIN_EXAMPLE
 USAGE:
     rip [OPTIONS] <TARGET>...
@@ -23,6 +27,5 @@ ARGS:
     <TARGET>...    File or directory to remove
 #+END_EXAMPLE
 
-
-** Why is there no =--interactive= option?
+*** Why is there no =--interactive= option?
 Asking for forgiveness is easier than asking for permission.
