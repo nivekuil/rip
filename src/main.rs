@@ -1,11 +1,12 @@
-// -*- compile-command: "cargo rustc" -*-
+// -*- compile-command: "cargo build" -*-
 #[macro_use]
 extern crate clap;
+extern crate walkdir;
 
 use clap::{Arg, App};
+use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::fs::create_dir_all;
+use std::fs;
 use std::env::current_dir;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
@@ -32,26 +33,61 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     let sources: clap::Values = matches.values_of("SOURCE").unwrap();
 
     for source in sources {
-        send_to_graveyard(source, graveyard);
+        if let Err(e) = send_to_graveyard(source, graveyard) {
+            println!("ERROR: {}", e);
+        }
     }
 }
 
-fn send_to_graveyard(source: &str, graveyard: &Path) {
-    let mut fullpath: PathBuf = current_dir().expect("Current dir error");
-    fullpath.push(Path::new(source));
-    let parent: &Path = fullpath.parent().expect("Trying to delete / ?");
-    let dest: PathBuf = graveyard.join(parent.strip_prefix("/").unwrap());
+fn send_to_graveyard(source: &str, graveyard: &Path) -> std::io::Result<()> {
+    let cwd: PathBuf = current_dir().expect("Error getting current directory");
+    let fullpath: PathBuf = cwd.join(Path::new(source));
+    let dest: PathBuf = {
+        // Can't join absolute paths, so we need to strip the leading "/"
+        let grave = graveyard.join(fullpath.strip_prefix("/").unwrap());
+        // Avoid a name conflict if necessary.
+        if grave.exists() {
+            numbered_rename(&grave)
+        }
+        else {
+            grave
+        }
+    };
 
-    create_dir_all(&dest).expect("Failed to create graveyard");
-
-    let output = Command::new("mv")
-        .arg("--backup=t")
-        .arg(source)
-        .arg(dest)
-        .output()
-        .expect("mv failed");
-
-    if !output.status.success() {
-        print!("{}", String::from_utf8(output.stderr).expect("Shell error"));
+    // Try a simple rename, which will only work within the same mount point.
+    // Trying to rename across filesystems will throw errno 18.
+    if let Ok(_) = fs::rename(&fullpath, &dest) {
+        return Ok(());
     }
+
+    // If that didn't work, then copy and rm.
+    if fullpath.is_dir() {
+        fs::create_dir_all(&dest).expect("Failed to create grave path");
+        for entry in WalkDir::new(source) {
+            let entry = entry.expect("Failed to open file in source dir");
+            let path = entry.path();
+            if path.is_dir() {
+                println!("{}", dest.join(path).display());
+                fs::create_dir(dest.join(path)).expect("Copy dir failed");
+            } else {
+                fs::copy(path, dest.join(path)).expect("Copy file failed");
+            }
+        }
+        fs::remove_dir_all(&fullpath).expect("Failed to remove source dir");
+    } else {
+        let parent: &Path = dest.parent().expect("Trying to delete / ?");
+        fs::create_dir_all(parent).expect("Failed to create grave path");
+        try!(fs::copy(&fullpath, &dest));
+        try!(fs::remove_file(source));
+    }
+
+    Ok(())
+}
+
+fn numbered_rename(path: &PathBuf) -> PathBuf {
+    (1_u64..)
+        .map(|i| path.with_extension(format!("~{}~", i)))
+        .skip_while(|p| p.exists())
+        .next()
+        .expect("Failed to rename duplicate file or directory")
 }
