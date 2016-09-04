@@ -29,7 +29,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .long("graveyard")
              .takes_value(true))
         .arg(Arg::with_name("decompose")
-            .help("Permanently deletes (unlink) the entire graveyard")
+             .help("Permanently deletes (unlink) the entire graveyard")
              .long("decompose"))
         .arg(Arg::with_name("seance")
              .help("List all objects in the graveyard that were sent from \
@@ -50,18 +50,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     // Can't join absolute paths, so we need to strip the leading "/"
     let cwd: &Path = cwd.strip_prefix("/").expect("cwd doesn't have a root?");
     if matches.is_present("seance") {
-        for entry in WalkDir::new(graveyard.join(cwd)) {
-            if let Err(_) = entry {
-                println!("No files were laid to rest from this directory.");
-            }
-            else {
-                let entry = entry.unwrap();
-                if entry.depth() == 0 {
-                    println!("Finding deleted files..");
-                    continue;
-                }
-                println!("{}", entry.path().display())
-            }
+        for entry in WalkDir::new(graveyard.join(cwd)).into_iter().skip(1) {
+            println!("{}", entry.unwrap().path().display());
         }
         return;
     }
