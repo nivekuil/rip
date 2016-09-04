@@ -7,7 +7,7 @@ use clap::{Arg, App};
 use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::env::current_dir;
+use std::env;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 
@@ -22,14 +22,20 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .required(true)
              .multiple(true)
              .index(1)
-             .conflicts_with("decompose"))
+             .conflicts_with("decompose")
+             .conflicts_with("seance"))
         .arg(Arg::with_name("graveyard")
              .help("Directory where deleted files go to rest")
              .long("graveyard")
              .takes_value(true))
         .arg(Arg::with_name("decompose")
-            .help("Permanently delete (unlink) the entire graveyard")
-            .long("decompose"))
+            .help("Permanently deletes (unlink) the entire graveyard")
+             .long("decompose"))
+        .arg(Arg::with_name("seance")
+             .help("List all objects in the graveyard that were sent from \
+                    the current directory")
+             .short("s")
+             .long("seance"))
         .get_matches();
 
     let graveyard: &Path = Path::new(matches.value_of("graveyard")
@@ -40,7 +46,26 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
-    let cwd: PathBuf = current_dir().expect("Error getting current directory");
+    let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
+    // Can't join absolute paths, so we need to strip the leading "/"
+    let cwd: &Path = cwd.strip_prefix("/").expect("cwd doesn't have a root?");
+    if matches.is_present("seance") {
+        for entry in WalkDir::new(graveyard.join(cwd)) {
+            if let Err(_) = entry {
+                println!("No files were laid to rest from this directory.");
+            }
+            else {
+                let entry = entry.unwrap();
+                if entry.depth() == 0 {
+                    println!("Finding deleted files..");
+                    continue;
+                }
+                println!("{}", entry.path().display())
+            }
+        }
+        return;
+    }
+
     if cwd.starts_with(graveyard) {
         println!("You should use rm to delete files in the graveyard, \
                   or --decompose to delete everything at once.");
@@ -55,11 +80,10 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 }
 
-fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
+fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
     let fullpath: PathBuf = cwd.join(Path::new(source));
     let dest: PathBuf = {
-        // Can't join absolute paths, so we need to strip the leading "/"
-        let grave = graveyard.join(fullpath.strip_prefix("/").unwrap());
+        let grave = graveyard.join(&fullpath);
         // Avoid a name conflict if necessary.
         if grave.exists() {
             // println!("found name conflict {}", grave.display());
