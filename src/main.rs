@@ -45,7 +45,6 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 }
 
 fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
-
     let fullpath: PathBuf = cwd.join(Path::new(source));
     let dest: PathBuf = {
         // Can't join absolute paths, so we need to strip the leading "/"
@@ -79,17 +78,18 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
             let orphan: &Path = path.strip_prefix(source)
                 .expect("Failed to descend into directory");
             if path.is_dir() {
-                // println!("Creating {}", dest.join(orphan).display());
                 if let Err(e) = fs::create_dir(dest.join(orphan)) {
-                    println!("Failed to create {}", path.display());
+                    println!("Failed to create {} in {}",
+                             path.display(),
+                             dest.join(orphan).display());
                     fs::remove_dir_all(&dest).unwrap();
                     return Err(e);
                 };
             } else {
-                // println!("Copying file {}", path.display());
-                // println!("to {}", dest.join(orphan).display());
                 if let Err(e) = fs::copy(path, dest.join(orphan)) {
-                    println!("Failed to copy {}", path.display());
+                    println!("Failed to copy {} to {}",
+                             path.display(),
+                             dest.join(orphan).display());
                     fs::remove_dir_all(&dest).unwrap();
                     return Err(e);
                 };
@@ -100,7 +100,7 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
         fs::create_dir_all(dest.parent().unwrap())
             .expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, &dest) {
-            println!("Failed to copy {}", source);
+            println!("Failed to copy {} to {}", source, dest.display());
             return Err(e);
         }
         if let Err(e) = fs::remove_file(source) {
