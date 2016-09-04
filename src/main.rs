@@ -82,6 +82,7 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
                 // println!("Creating {}", dest.join(orphan).display());
                 if let Err(e) = fs::create_dir(dest.join(orphan)) {
                     println!("Failed to create {}", path.display());
+                    fs::remove_dir_all(&dest).unwrap();
                     return Err(e);
                 };
             } else {
@@ -89,6 +90,7 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
                 // println!("to {}", dest.join(orphan).display());
                 if let Err(e) = fs::copy(path, dest.join(orphan)) {
                     println!("Failed to copy {}", path.display());
+                    fs::remove_dir_all(&dest).unwrap();
                     return Err(e);
                 };
             }
