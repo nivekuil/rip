@@ -14,17 +14,19 @@ Get a binary [[https://github.com/nivekuil/rip/releases][release]] or clone the 
 ** Usage
 #+BEGIN_EXAMPLE
 USAGE:
-    rip [OPTIONS] <TARGET>...
+    rip [FLAGS] [OPTIONS] <SOURCE>...
 
 FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+        --decompose    Permanently deletes (unlink) the entire graveyard
+    -h, --help         Prints help information
+    -s, --seance       List all objects in the graveyard that were sent from the current directory
+    -V, --version      Prints version information
 
 OPTIONS:
         --graveyard <graveyard>    Directory where deleted files go to rest
 
 ARGS:
-    <TARGET>...    File or directory to remove
+    <SOURCE>...    File or directory to remove
 #+END_EXAMPLE
 
 *** Why is there no =--interactive= option?
