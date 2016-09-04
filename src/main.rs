@@ -18,25 +18,36 @@ fn main() {
         .about("Rm ImProved
 Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         .arg(Arg::with_name("SOURCE")
-            .help("File or directory to remove")
-            .required(true)
-            .multiple(true)
-            .index(1))
+             .help("File or directory to remove")
+             .required(true)
+             .multiple(true)
+             .index(1)
+             .conflicts_with("decompose"))
         .arg(Arg::with_name("graveyard")
-            .help("Directory where deleted files go to rest")
-            .long("graveyard")
-            .takes_value(true))
+             .help("Directory where deleted files go to rest")
+             .long("graveyard")
+             .takes_value(true))
+        .arg(Arg::with_name("decompose")
+            .help("Permanently delete (unlink) the entire graveyard")
+            .long("decompose"))
         .get_matches();
 
     let graveyard: &Path = Path::new(matches.value_of("graveyard")
-        .unwrap_or(GRAVEYARD));
-    let sources: clap::Values = matches.values_of("SOURCE").unwrap();
-    let cwd: PathBuf = current_dir().expect("Error getting current directory");
-    if cwd.starts_with(graveyard) {
-        println!("You should use rm to delete files in the graveyard.");
+                                     .unwrap_or(GRAVEYARD));
+
+    if matches.is_present("decompose") {
+        fs::remove_dir_all(graveyard).expect("Failed to delete graveyard");
         return;
     }
 
+    let cwd: PathBuf = current_dir().expect("Error getting current directory");
+    if cwd.starts_with(graveyard) {
+        println!("You should use rm to delete files in the graveyard, \
+                  or --decompose to delete everything at once.");
+        return;
+    }
+
+    let sources: clap::Values = matches.values_of("SOURCE").unwrap();
     for source in sources {
         if let Err(e) = bury(source, &cwd, graveyard) {
             println!("ERROR: {}: {}", e, source);
