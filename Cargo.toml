@@ -1,6 +1,6 @@
 [project]
 name = "rip"                    # rm improved
-version = "0.1.3"
+version = "0.1.4"
 authors = ["mail@nivekuil.com"]
 
 [dependencies]
