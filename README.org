@@ -9,7 +9,7 @@ If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), y
 This can be a good idea because the graveyard is in /tmp by default, which can quickly fill up your RAM if /tmp is mounted as tmpfs.  It's also slower than moving files within the same filesystem.
 
 ** Installation
-Get a binary release or clone the repository and run =cargo build=.
+Get a binary [[https://github.com/nivekuil/rip/releases][release]] or clone the repository and run =cargo build=.
 
 ** Usage
 #+BEGIN_EXAMPLE
