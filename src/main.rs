@@ -39,7 +39,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     for source in sources {
         if let Err(e) = bury(source, &cwd, graveyard) {
-            println!("ERROR: {}, {}", e, source);
+            println!("ERROR: {}: {}", e, source);
         }
     }
 }
@@ -60,7 +60,6 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
     };
     // println!("dest is {}", dest.display());
 
-    fs::create_dir_all(&dest).expect("Failed to create grave path");
 
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
@@ -70,14 +69,15 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
 
     // If that didn't work, then copy and rm.
     if fullpath.is_dir() {
-        for entry in WalkDir::new(source) {
+        fs::create_dir_all(&dest).expect("Failed to create grave path");
+        for entry in WalkDir::new(source).into_iter().skip(1) {
             let entry = entry.expect("Failed to open file in source dir");
             let path: &Path = entry.path();
-            let orphan: &Path = path.strip_prefix(path.parent().unwrap())
+            let orphan: &Path = path.strip_prefix(source)
                 .expect("Failed to descend into directory");
             if path.is_dir() {
-                // println!("Creating {}", dest.join(path).display());
-                try!(fs::create_dir(dest.join(path)));
+                // println!("Creating {}", dest.join(orphan).display());
+                try!(fs::create_dir(dest.join(orphan)));
             } else {
                 // println!("Copying file {}", path.display());
                 // println!("to {}", dest.join(orphan).display());
@@ -86,6 +86,8 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
         }
         fs::remove_dir_all(source).expect("Failed to remove source dir");
     } else {
+        fs::create_dir_all(dest.parent().unwrap())
+            .expect("Failed to create grave path");
         try!(fs::copy(source, &dest));
         try!(fs::remove_file(source));
     }
