@@ -58,8 +58,6 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
             grave
         }
     };
-    // println!("dest is {}", dest.display());
-
 
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
@@ -69,7 +67,12 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
 
     // If that didn't work, then copy and rm.
     if fullpath.is_dir() {
+        // Create all directories including the top-level dir, and then
+        // skip the top-level dir in WalkDir because it may be renamed
+        // due to name collision
         fs::create_dir_all(&dest).expect("Failed to create grave path");
+
+        // Walk the source, creating directories and copying files as needed
         for entry in WalkDir::new(source).into_iter().skip(1) {
             let entry = entry.expect("Failed to open file in source dir");
             let path: &Path = entry.path();
@@ -77,19 +80,31 @@ fn bury(source: &str, cwd: &PathBuf, graveyard: &Path) -> std::io::Result<()> {
                 .expect("Failed to descend into directory");
             if path.is_dir() {
                 // println!("Creating {}", dest.join(orphan).display());
-                try!(fs::create_dir(dest.join(orphan)));
+                if let Err(e) = fs::create_dir(dest.join(orphan)) {
+                    println!("Failed to create {}", path.display());
+                    return Err(e);
+                };
             } else {
                 // println!("Copying file {}", path.display());
                 // println!("to {}", dest.join(orphan).display());
-                try!(fs::copy(path, dest.join(orphan)));
+                if let Err(e) = fs::copy(path, dest.join(orphan)) {
+                    println!("Failed to copy {}", path.display());
+                    return Err(e);
+                };
             }
         }
         fs::remove_dir_all(source).expect("Failed to remove source dir");
     } else {
         fs::create_dir_all(dest.parent().unwrap())
             .expect("Failed to create grave path");
-        try!(fs::copy(source, &dest));
-        try!(fs::remove_file(source));
+        if let Err(e) = fs::copy(source, &dest) {
+            println!("Failed to copy {}", source);
+            return Err(e);
+        }
+        if let Err(e) = fs::remove_file(source) {
+            println!("Failed to remove {}", source);
+            return Err(e);
+        };
     }
 
     Ok(())
