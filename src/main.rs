@@ -109,7 +109,7 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
                              dest.join(orphan).display());
                     fs::remove_dir_all(&dest).unwrap();
                     return Err(e);
-                };
+                }
             } else {
                 if let Err(e) = fs::copy(path, dest.join(orphan)) {
                     println!("Failed to copy {} to {}",
@@ -117,13 +117,13 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
                              dest.join(orphan).display());
                     fs::remove_dir_all(&dest).unwrap();
                     return Err(e);
-                };
+                }
             }
         }
         fs::remove_dir_all(source).expect("Failed to remove source dir");
     } else if filedata.is_file() {
-        fs::create_dir_all(dest.parent().unwrap())
-            .expect("Failed to create grave path");
+        let parent = dest.parent().unwrap();
+        fs::create_dir_all(parent).expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, &dest) {
             println!("Failed to copy {} to {}", source, dest.display());
             return Err(e);
@@ -131,7 +131,7 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
         if let Err(e) = fs::remove_file(source) {
             println!("Failed to remove {}", source);
             return Err(e);
-        };
+        }
     } else {
         println!("Invalid file or directory {}", source);
     }
