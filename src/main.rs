@@ -29,7 +29,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .long("graveyard")
              .takes_value(true))
         .arg(Arg::with_name("decompose")
-             .help("Permanently deletes (unlink) the entire graveyard")
+             .help("Permanently delete (unlink) the entire graveyard")
              .long("decompose"))
         .arg(Arg::with_name("seance")
              .help("List all objects in the graveyard that were sent from \
@@ -42,7 +42,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                                      .unwrap_or(GRAVEYARD));
 
     if matches.is_present("decompose") {
-        fs::remove_dir_all(graveyard).expect("Failed to delete graveyard");
+        fs::remove_dir_all(graveyard).is_ok();
         return;
     }
 
@@ -90,7 +90,7 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
     }
 
     // If that didn't work, then copy and rm.
-    if fullpath.is_dir() {
+    if Path::new(source).is_dir() {
         // Create all directories including the top-level dir, and then
         // skip the top-level dir in WalkDir because it may be renamed
         // due to name collision
@@ -121,7 +121,7 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
             }
         }
         fs::remove_dir_all(source).expect("Failed to remove source dir");
-    } else {
+    } else if fullpath.is_file() {
         fs::create_dir_all(dest.parent().unwrap())
             .expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, &dest) {
@@ -132,6 +132,8 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
             println!("Failed to remove {}", source);
             return Err(e);
         };
+    } else {
+        println!("Invalid file or directory {}", source);
     }
 
     Ok(())
