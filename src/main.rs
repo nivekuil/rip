@@ -71,9 +71,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 }
 
 fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
-    let fullpath: PathBuf = cwd.join(Path::new(source));
     let dest: PathBuf = {
-        let grave = graveyard.join(&fullpath);
+        let grave = graveyard.join(cwd.join(Path::new(source)));
         // Avoid a name conflict if necessary.
         if grave.exists() {
             // println!("found name conflict {}", grave.display());
@@ -90,7 +89,8 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
     }
 
     // If that didn't work, then copy and rm.
-    if Path::new(source).is_dir() {
+    let filedata = fs::metadata(source).expect("Failed to stat source");
+    if filedata.is_dir() {
         // Create all directories including the top-level dir, and then
         // skip the top-level dir in WalkDir because it may be renamed
         // due to name collision
@@ -121,7 +121,7 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
             }
         }
         fs::remove_dir_all(source).expect("Failed to remove source dir");
-    } else if fullpath.is_file() {
+    } else if filedata.is_file() {
         fs::create_dir_all(dest.parent().unwrap())
             .expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, &dest) {
