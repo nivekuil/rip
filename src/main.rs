@@ -18,28 +18,28 @@ fn main() {
         .about("Rm ImProved
 Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         .arg(Arg::with_name("SOURCE")
-             .help("File or directory to remove")
-             .required(true)
-             .multiple(true)
-             .index(1)
-             .conflicts_with("decompose")
-             .conflicts_with("seance"))
+            .help("File or directory to remove")
+            .required(true)
+            .multiple(true)
+            .index(1)
+            .conflicts_with("decompose")
+            .conflicts_with("seance"))
         .arg(Arg::with_name("graveyard")
-             .help("Directory where deleted files go to rest")
-             .long("graveyard")
-             .takes_value(true))
+            .help("Directory where deleted files go to rest")
+            .long("graveyard")
+            .takes_value(true))
         .arg(Arg::with_name("decompose")
-             .help("Permanently delete (unlink) the entire graveyard")
-             .long("decompose"))
+            .help("Permanently delete (unlink) the entire graveyard")
+            .long("decompose"))
         .arg(Arg::with_name("seance")
-             .help("List all objects in the graveyard that were sent from \
-                    the current directory")
-             .short("s")
-             .long("seance"))
+            .help("List all objects in the graveyard that were sent from the \
+                   current directory")
+            .short("s")
+            .long("seance"))
         .get_matches();
 
     let graveyard: &Path = Path::new(matches.value_of("graveyard")
-                                     .unwrap_or(GRAVEYARD));
+        .unwrap_or(GRAVEYARD));
 
     if matches.is_present("decompose") {
         fs::remove_dir_all(graveyard).is_ok();
@@ -74,12 +74,7 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
     let dest: PathBuf = {
         let grave = graveyard.join(cwd.join(Path::new(source)));
         // Avoid a name conflict if necessary.
-        if grave.exists() {
-            // println!("found name conflict {}", grave.display());
-            numbered_rename(&grave)
-        } else {
-            grave
-        }
+        if grave.exists() { rename_grave(grave) } else { grave }
     };
 
     // Try a simple rename, which will only work within the same mount point.
@@ -139,10 +134,26 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn numbered_rename(path: &PathBuf) -> PathBuf {
-    (1_u64..)
-        .map(|i| path.with_extension(format!("~{}~", i)))
-        .skip_while(|p| p.exists())
-        .next()
-        .expect("Failed to rename duplicate file or directory")
+fn rename_grave(grave: PathBuf) -> PathBuf {
+    if grave.extension().is_none() {
+        (1_u64..)
+            .map(|i| grave.with_extension(i.to_string()))
+            .skip_while(|p| p.exists())
+            .next()
+            .expect("Failed to rename duplicate file or directory")
+    }
+    else {
+        (1_u64..)
+            .map(|i| {
+                grave.with_extension(format!("{}.{}",
+                                             grave.extension()
+                                             .unwrap()
+                                             .to_str()
+                                             .unwrap(),
+                                             i))
+            })
+            .skip_while(|p| p.exists())
+            .next()
+            .expect("Failed to rename duplicate file or directory")
+    }
 }
