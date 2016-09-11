@@ -3,7 +3,7 @@ A safer, (eventually) more powerful =rm= written in Rust.
 
 Deleted files get sent to the graveyard (=/tmp/.graveyard=).  Their path is preserved, with all parent directories being created under the graveyard.
 
-No data is overwritten.  If files that share the same path are deleted, they will be numbered backups courtesy of =mv(1)=.
+No data is overwritten.  If files that share the same path are deleted, they will be moved as numbered backups.
 
 If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you could alias =rip= to =rip --graveyard ~/.local/share/Trash=.
 This can be a good idea because the graveyard is in /tmp by default, which can quickly fill up your RAM if /tmp is mounted as tmpfs.  It's also slower than moving files within the same filesystem.
