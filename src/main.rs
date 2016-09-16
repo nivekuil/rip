@@ -102,7 +102,7 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
                     println!("Failed to create {} in {}",
                              path.display(),
                              dest.join(orphan).display());
-                    fs::remove_dir_all(&dest).unwrap();
+                    try!(fs::remove_dir_all(&dest));
                     return Err(e);
                 }
             } else {
@@ -110,7 +110,7 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
                     println!("Failed to copy {} to {}",
                              path.display(),
                              dest.join(orphan).display());
-                    fs::remove_dir_all(&dest).unwrap();
+                    try!(fs::remove_dir_all(&dest));
                     return Err(e);
                 }
             }
@@ -141,15 +141,14 @@ fn rename_grave(grave: PathBuf) -> PathBuf {
             .skip_while(|p| p.exists())
             .next()
             .expect("Failed to rename duplicate file or directory")
-    }
-    else {
+    } else {
         (1_u64..)
             .map(|i| {
                 grave.with_extension(format!("{}.{}",
                                              grave.extension()
-                                             .unwrap()
-                                             .to_str()
-                                             .unwrap(),
+                                                 .unwrap()
+                                                 .to_str()
+                                                 .unwrap(),
                                              i))
             })
             .skip_while(|p| p.exists())
