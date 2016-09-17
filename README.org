@@ -17,8 +17,9 @@ USAGE:
     rip [FLAGS] [OPTIONS] <SOURCE>...
 
 FLAGS:
-        --decompose    Permanently deletes (unlink) the entire graveyard
+        --decompose    Permanently delete (unlink) the entire graveyard
     -h, --help         Prints help information
+    -r, --resurrect    Undo the last deletion
     -s, --seance       List all objects in the graveyard that were sent from the current directory
     -V, --version      Prints version information
 
