@@ -43,7 +43,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .short("s")
              .long("seance"))
         .arg(Arg::with_name("resurrect")
-             .help("Undo the last deletion")
+             .help("Undo the last removal")
              .short("r")
              .long("resurrect"))
         .get_matches();
