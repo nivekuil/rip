@@ -6,3 +6,6 @@ authors = ["mail@nivekuil.com"]
 [dependencies]
 clap = "2"
 walkdir = "0.1"
+
+[profile.release]
+lto = true

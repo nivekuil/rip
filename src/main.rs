@@ -1,5 +1,7 @@
 // -*- compile-command: "cargo build" -*-
+#![feature(alloc_system)]
 #![feature(core_str_ext)]
+extern crate alloc_system;
 #[macro_use]
 extern crate clap;
 extern crate core;
