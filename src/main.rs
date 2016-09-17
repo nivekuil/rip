@@ -151,8 +151,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
         for entry in WalkDir::new(source).into_iter().skip(1) {
             let entry = entry.expect("Failed to open file in source dir");
             let path: &Path = entry.path();
-            let orphan: &Path = path.strip_prefix(source)
-                .expect("Failed to descend into directory");
+            let orphan: &Path = path.strip_prefix(source).unwrap();
             if path.is_dir() {
                 if let Err(e) = fs::create_dir(dest.join(orphan)) {
                     println!("Failed to create {} in {}",
@@ -203,9 +202,9 @@ fn rename_grave(grave: PathBuf) -> PathBuf {
             .map(|i| {
                 grave.with_extension(format!("{}.{}",
                                              grave.extension()
-                                                 .unwrap()
-                                                 .to_str()
-                                                 .unwrap(),
+                                             .unwrap()
+                                             .to_str()
+                                             .unwrap(),
                                              i))
             })
             .skip_while(|p| p.exists())
