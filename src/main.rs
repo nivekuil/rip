@@ -120,12 +120,13 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 fn write_log(source: PathBuf, dest: PathBuf, graveyard: &Path)
              -> std::io::Result<()> {
     let histfile = graveyard.join(HISTFILE);
-    let mut f = try!(fs::File::create(histfile));
-    try!(f.write_all(
-        format!("{}\t{}",
-                source.to_str().unwrap(),
-                dest.to_str().unwrap(),
-        ).as_bytes()));
+    {
+        let mut f = try!(fs::File::create(histfile));
+        try!(f.write_all(format!("{}\t{}",
+                                 source.to_str().unwrap(),
+                                 dest.to_str().unwrap())
+                         .as_bytes()));
+    }
 
     Ok(())
 }
