@@ -1,14 +1,17 @@
 // -*- compile-command: "cargo build" -*-
+#![feature(core_str_ext)]
 #[macro_use]
 extern crate clap;
+extern crate core;
 extern crate walkdir;
 
 use clap::{Arg, App};
+use core::str::StrExt;
 use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::io::Write;
 use std::env;
+use std::io::{Read, Write};
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
@@ -20,24 +23,29 @@ fn main() {
         .about("Rm ImProved
 Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         .arg(Arg::with_name("SOURCE")
-            .help("File or directory to remove")
-            .required(true)
-            .multiple(true)
-            .index(1)
-            .conflicts_with("decompose")
-            .conflicts_with("seance"))
+             .help("File or directory to remove")
+             .required(true)
+             .multiple(true)
+             .index(1)
+             .conflicts_with("decompose")
+             .conflicts_with("seance")
+             .conflicts_with("resurrect"))
         .arg(Arg::with_name("graveyard")
-            .help("Directory where deleted files go to rest")
-            .long("graveyard")
-            .takes_value(true))
+             .help("Directory where deleted files go to rest")
+             .long("graveyard")
+             .takes_value(true))
         .arg(Arg::with_name("decompose")
-            .help("Permanently delete (unlink) the entire graveyard")
-            .long("decompose"))
+             .help("Permanently delete (unlink) the entire graveyard")
+             .long("decompose"))
         .arg(Arg::with_name("seance")
-            .help("List all objects in the graveyard that were sent from the \
-                   current directory")
-            .short("s")
-            .long("seance"))
+             .help("List all objects in the graveyard that were sent from the \
+                    current directory")
+             .short("s")
+             .long("seance"))
+        .arg(Arg::with_name("resurrect")
+             .help("Undo the last deletion")
+             .short("r")
+             .long("resurrect"))
         .get_matches();
 
     let graveyard: &Path = Path::new(matches.value_of("graveyard")
@@ -48,7 +56,23 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
+    if matches.is_present("resurrect") {
+        let histfile = graveyard.join(HISTFILE);
+        let mut f = fs::File::open(histfile).expect("No histfile found.");
+        let mut s = String::new();
+        f.read_to_string(&mut s).unwrap();
+        let mut tokens = StrExt::split(s.as_str(), "\t");
+        let dest = tokens.next().expect("Bad histfile format for dest");
+        let source = tokens.next().expect("Bad histfile format for source");
+        if let Err(e) = bury(Path::new(source), Path::new(dest)) {
+            println!("ERROR: {}: {}", e, source);
+        }
+        println!("Returned {} to {}", source, dest);
+        return;
+    }
+
     let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
+
     if matches.is_present("seance") {
         let path = cwd.strip_prefix("/").unwrap();
         for entry in WalkDir::new(graveyard.join(path)).into_iter().skip(1) {
@@ -63,11 +87,10 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
-    let sources: clap::Values = matches.values_of("SOURCE").unwrap();
-    for source in sources {
+    for source in matches.values_of("SOURCE").unwrap() {
         let path: PathBuf = cwd.join(Path::new(source));
-        // Can't join absolute paths, so we need to strip the leading "/"
         let dest: PathBuf = {
+            // Can't join absolute paths, so we need to strip the leading "/"
             let grave = graveyard.join(path.strip_prefix("/").unwrap());
             if grave.exists() { rename_grave(grave) } else { grave }
         };
@@ -80,7 +103,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 }
 
-/// Write deletion history to HISTFILE in the format "SOURCE\tDEST".
+/// Write deletion history to HISTFILE in the format "SOURCEPATH\tGRAVEPATH".
 fn write_log(source: PathBuf, dest: PathBuf, graveyard: &Path)
              -> std::io::Result<()> {
     let histfile = graveyard.join(HISTFILE);
