@@ -57,10 +57,17 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 
     if matches.is_present("resurrect") {
-        let histfile = graveyard.join(HISTFILE);
-        let mut f = fs::File::open(histfile).expect("No histfile found.");
+        let histfile: PathBuf = graveyard.join(HISTFILE);
         let mut s = String::new();
-        f.read_to_string(&mut s).unwrap();
+        {
+            if let Ok(mut f) = fs::File::open(&histfile) {
+                f.read_to_string(&mut s).unwrap();
+            }
+            else {
+                println!("Couldn't read history at {}", histfile.display());
+                return;
+            }
+        }
         let mut tokens = StrExt::split(s.as_str(), "\t");
         let dest = tokens.next().expect("Bad histfile format for dest");
         let source = tokens.next().expect("Bad histfile format for source");
@@ -68,14 +75,15 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             println!("ERROR: {}: {}", e, source);
         }
         println!("Returned {} to {}", source, dest);
+        fs::remove_file(histfile).expect("Failed to update histfile");
         return;
     }
 
     let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
 
     if matches.is_present("seance") {
-        let path = cwd.strip_prefix("/").unwrap();
-        for entry in WalkDir::new(graveyard.join(path)).into_iter().skip(1) {
+        let path = graveyard.join(cwd.strip_prefix("/").unwrap());
+        for entry in WalkDir::new(path).into_iter().skip(1) {
             println!("{}", entry.unwrap().path().display());
         }
         return;
@@ -89,6 +97,11 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     for source in matches.values_of("SOURCE").unwrap() {
         let path: PathBuf = cwd.join(Path::new(source));
+        if !path.exists() {
+            println!("Cannot remove {}: no such file or directory",
+                     path.display());
+            return;
+        }
         let dest: PathBuf = {
             // Can't join absolute paths, so we need to strip the leading "/"
             let grave = graveyard.join(path.strip_prefix("/").unwrap());
