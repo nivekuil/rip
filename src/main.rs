@@ -7,9 +7,11 @@ use clap::{Arg, App};
 use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
 use std::fs;
+use std::io::Write;
 use std::env;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
+static HISTFILE: &'static str = ".rip_history";
 
 fn main() {
     let matches = App::with_defaults("rip")
@@ -47,10 +49,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 
     let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
-    // Can't join absolute paths, so we need to strip the leading "/"
-    let cwd: &Path = cwd.strip_prefix("/").expect("cwd doesn't have a root?");
     if matches.is_present("seance") {
-        for entry in WalkDir::new(graveyard.join(cwd)).into_iter().skip(1) {
+        let path = cwd.strip_prefix("/").unwrap();
+        for entry in WalkDir::new(graveyard.join(path)).into_iter().skip(1) {
             println!("{}", entry.unwrap().path().display());
         }
         return;
@@ -64,33 +65,49 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     let sources: clap::Values = matches.values_of("SOURCE").unwrap();
     for source in sources {
-        if let Err(e) = bury(source, &cwd, graveyard) {
+        let path: PathBuf = cwd.join(Path::new(source));
+        // Can't join absolute paths, so we need to strip the leading "/"
+        let dest: PathBuf = {
+            let grave = graveyard.join(path.strip_prefix("/").unwrap());
+            if grave.exists() { rename_grave(grave) } else { grave }
+        };
+        if let Err(e) = bury(path.as_path(), dest.as_path()) {
             println!("ERROR: {}: {}", e, source);
+        }
+        if let Err(e) = write_log(path, dest, graveyard) {
+            println!("Error adding {} to histfile: {}", source, e);
         }
     }
 }
 
-fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
-    let dest: PathBuf = {
-        let grave = graveyard.join(cwd.join(Path::new(source)));
-        // Avoid a name conflict if necessary.
-        if grave.exists() { rename_grave(grave) } else { grave }
-    };
+/// Write deletion history to HISTFILE in the format "SOURCE\tDEST".
+fn write_log(source: PathBuf, dest: PathBuf, graveyard: &Path)
+             -> std::io::Result<()> {
+    let histfile = graveyard.join(HISTFILE);
+    let mut f = try!(fs::File::create(histfile));
+    try!(f.write_all(
+        format!("{}\t{}",
+                source.to_str().unwrap(),
+                dest.to_str().unwrap(),
+        ).as_bytes()));
 
+    Ok(())
+}
+
+fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
     if let Ok(_) = fs::rename(source, &dest) {
         return Ok(());
     }
-
     // If that didn't work, then copy and rm.
     let filedata = fs::metadata(source).expect("Failed to stat source");
+
     if filedata.is_dir() {
         // Create all directories including the top-level dir, and then
         // skip the top-level dir in WalkDir because it may be renamed
         // due to name collision
         fs::create_dir_all(&dest).expect("Failed to create grave path");
-
         // Walk the source, creating directories and copying files as needed
         for entry in WalkDir::new(source).into_iter().skip(1) {
             let entry = entry.expect("Failed to open file in source dir");
@@ -120,15 +137,16 @@ fn bury(source: &str, cwd: &Path, graveyard: &Path) -> std::io::Result<()> {
         let parent = dest.parent().unwrap();
         fs::create_dir_all(parent).expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, &dest) {
-            println!("Failed to copy {} to {}", source, dest.display());
+            println!("Failed to copy {} to {}",
+                     source.display(), dest.display());
             return Err(e);
         }
         if let Err(e) = fs::remove_file(source) {
-            println!("Failed to remove {}", source);
+            println!("Failed to remove {}", source.display());
             return Err(e);
         }
     } else {
-        println!("Invalid file or directory {}", source);
+        println!("Invalid file or directory {}", source.display());
     }
 
     Ok(())
