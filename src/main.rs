@@ -184,7 +184,9 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
             return Err(e);
         }
     } else {
-        println!("Invalid file or directory {}", source.display());
+        println!("Non-regular file or directory: {}", source.display());
+        try!(fs::copy(source, &dest));
+        try!(fs::remove_file(source));
     }
 
     Ok(())
