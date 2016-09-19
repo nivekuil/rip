@@ -112,7 +112,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         if let Err(e) = bury(path.as_path(), dest.as_path()) {
             println!("ERROR: {}: {}", e, source);
         }
-        if let Err(e) = write_log(path, dest, graveyard) {
+        else if let Err(e) = write_log(path, dest, graveyard) {
             println!("Error adding {} to histfile: {}", source, e);
         }
     }
