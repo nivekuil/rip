@@ -111,31 +111,36 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 }
 
-fn read_last_line(file: &PathBuf) -> std::io::Result<String> {
-    match fs::File::open(file) {
+fn read_last_line(path: &PathBuf) -> std::io::Result<String> {
+    match fs::File::open(path) {
         Ok(f) => BufReader::new(f)
             .lines()
             .last()
-            .expect("Couldn't get last line"),
+            .expect("Failed to read histfile"),
         Err(e) => Err(e)
     }
 }
 
 /// Set the length of the file to the difference between the size of the file
 /// and the size of last line of the file
-fn delete_last_line(file: &PathBuf) -> std::io::Result<()> {
-    match fs::OpenOptions::new().write(true).open(file) {
+fn delete_last_line(path: &PathBuf) -> std::io::Result<()> {
+    match fs::OpenOptions::new().write(true).open(path) {
         Ok(f) => {
             let total: u64 = f
                 .metadata()
                 .expect("Failed to stat file")
                 .len();
-            let last_line: usize = read_last_line(file)
+            let last_line: usize = read_last_line(path)
                 .unwrap()
                 .bytes()
                 .count();
-            f.set_len(total - last_line as u64 - 1)
-                .expect("Failed to truncate file");
+            let difference = total - last_line as u64 - 1;
+            if difference == 0 {
+                try!(fs::remove_file(path));
+            } else {
+                f.set_len(difference).expect("Failed to truncate file");
+            }
+
             Ok(())
         },
         Err(e) => Err(e)
