@@ -13,7 +13,7 @@ use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::env;
-use std::io::{Read, Write};
+use std::io::{Write, BufRead, BufReader};
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
@@ -60,30 +60,24 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     if matches.is_present("resurrect") {
         let histfile: PathBuf = graveyard.join(HISTFILE);
-        let mut s = String::new();
-        {
-            if let Ok(mut f) = fs::File::open(&histfile) {
-                f.read_to_string(&mut s).unwrap();
-            }
-            else {
-                println!("Couldn't read history at {}", histfile.display());
-                return;
+        if let Ok(s) = read_last_line(&histfile) {
+            let mut tokens = StrExt::split(s.as_str(), "\t");
+            let dest = tokens.next().expect("Bad histfile format: column A");
+            let source = tokens.next().expect("Bad histfile format: column B");
+            if let Err(e) = bury(Path::new(source), Path::new(dest)) {
+                println!("ERROR: {}: {}", e, source);
+            } else {
+                println!("Returned {} to {}", source, dest);
+                delete_last_line(&histfile).expect("Failed to remove history");
             }
         }
-        let mut tokens = StrExt::split(s.as_str(), "\t");
-        let dest = tokens.next().expect("Bad histfile format for dest");
-        let source = tokens.next().expect("Bad histfile format for source");
-        if let Err(e) = bury(Path::new(source), Path::new(dest)) {
-            println!("ERROR: {}: {}", e, source);
-        }
-        println!("Returned {} to {}", source, dest);
-        fs::remove_file(histfile).expect("Failed to update histfile");
         return;
     }
 
     let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
 
     if matches.is_present("seance") {
+        // Can't join absolute paths, so we need to strip the leading "/"
         let path = graveyard.join(cwd.strip_prefix("/").unwrap());
         for entry in WalkDir::new(path).into_iter().skip(1) {
             println!("{}", entry.unwrap().path().display());
@@ -109,22 +103,55 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             let grave = graveyard.join(path.strip_prefix("/").unwrap());
             if grave.exists() { rename_grave(grave) } else { grave }
         };
-        if let Err(e) = bury(path.as_path(), dest.as_path()) {
+        if let Err(e) = bury(&path, &dest) {
             println!("ERROR: {}: {}", e, source);
-        }
-        else if let Err(e) = write_log(path, dest, graveyard) {
+        } else if let Err(e) = write_log(&path, &dest, graveyard) {
             println!("Error adding {} to histfile: {}", source, e);
         }
     }
 }
 
-/// Write deletion history to HISTFILE in the format "SOURCEPATH\tGRAVEPATH".
-fn write_log(source: PathBuf, dest: PathBuf, graveyard: &Path)
+fn read_last_line(file: &PathBuf) -> std::io::Result<String> {
+    match fs::File::open(file) {
+        Ok(f) => BufReader::new(f)
+            .lines()
+            .last()
+            .expect("Couldn't get last line"),
+        Err(e) => Err(e)
+    }
+}
+
+/// Set the length of the file to the difference between the size of the file
+/// and the size of last line of the file
+fn delete_last_line(file: &PathBuf) -> std::io::Result<()> {
+    match fs::OpenOptions::new().write(true).open(file) {
+        Ok(f) => {
+            let total: u64 = f
+                .metadata()
+                .expect("Failed to stat file")
+                .len();
+            let last_line: usize = read_last_line(file)
+                .unwrap()
+                .bytes()
+                .count();
+            f.set_len(total - last_line as u64 - 1)
+                .expect("Failed to truncate file");
+            Ok(())
+        },
+        Err(e) => Err(e)
+    }
+}
+
+/// Write deletion history to HISTFILE in the format "SOURCEPATH\tGRAVEPATH\n".
+fn write_log(source: &PathBuf, dest: &PathBuf, graveyard: &Path)
              -> std::io::Result<()> {
     let histfile = graveyard.join(HISTFILE);
     {
-        let mut f = try!(fs::File::create(histfile));
-        try!(f.write_all(format!("{}\t{}",
+        let mut f = try!(fs::OpenOptions::new()
+                         .create(true)
+                         .append(true)
+                         .open(histfile));
+        try!(f.write_all(format!("{}\t{}\n",
                                  source.to_str().unwrap(),
                                  dest.to_str().unwrap())
                          .as_bytes()));
@@ -151,6 +178,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
         for entry in WalkDir::new(source).into_iter().skip(1) {
             let entry = entry.expect("Failed to open file in source dir");
             let path: &Path = entry.path();
+            // Path without the top-level directory
             let orphan: &Path = path.strip_prefix(source).unwrap();
             if path.is_dir() {
                 if let Err(e) = fs::create_dir(dest.join(orphan)) {
