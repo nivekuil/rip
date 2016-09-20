@@ -1,15 +1,14 @@
 * rip (Rm ImProved)
-A safer, (eventually) more powerful =rm= written in Rust.
+A safety-focused alternative to =rm=.
 
-Deleted files get sent to the graveyard (=/tmp/.graveyard=).  Their path is preserved, with all parent directories being created under the graveyard.
+Deleted files get sent to the graveyard (=/tmp/.graveyard= by default) under their absolute path) instead of being unlinked, giving you a chance to recover them.
 
-No data is overwritten.  If files that share the same path are deleted, they will be moved as numbered backups.
+No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
 
-If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you could alias =rip= to =rip --graveyard ~/.local/share/Trash=.
-This can be a good idea because the graveyard is in /tmp by default, which can quickly fill up your RAM if /tmp is mounted as tmpfs.  It's also slower than moving files within the same filesystem.
+If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you could alias =rip= to =rip --graveyard ~/.local/share/Trash=.  This can be a good idea because if the graveyard is in a tmpfs mount, deleting large files can quickly fill up your RAM.  It's also slower than moving files within the same filesystem.
 
 ** Installation
-Get a binary [[https://github.com/nivekuil/rip/releases][release]] or clone the repository and run =cargo build=.
+Get a binary [[https://github.com/nivekuil/rip/releases][release]] (x86_64) or clone the repository and run =cargo build=.
 
 ** Usage
 #+BEGIN_EXAMPLE
