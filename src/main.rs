@@ -135,6 +135,8 @@ fn delete_last_line(path: &PathBuf) -> std::io::Result<()> {
                 .bytes()
                 .count();
             let difference = total - last_line as u64 - 1;
+            // Remove histfile if it would be truncated to 0 to avoid a panic
+            // when reading
             if difference == 0 {
                 try!(fs::remove_file(path));
             } else {
