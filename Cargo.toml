@@ -16,3 +16,6 @@ walkdir = "0.1"
 
 [profile.release]
 lto = true
+
+[[bin]]
+name = "rip"
