@@ -79,7 +79,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     if matches.is_present("seance") {
         // Can't join absolute paths, so we need to strip the leading "/"
         let path = graveyard.join(cwd.strip_prefix("/").unwrap());
-        for entry in WalkDir::new(path).into_iter().skip(1) {
+        for entry in walk_into_dir(path) {
             println!("{}", entry.unwrap().path().display());
         }
         return;
@@ -173,17 +173,17 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
     if let Ok(_) = fs::rename(source, &dest) {
         return Ok(());
     }
-    // If that didn't work, then copy and rm.
-    let filedata = fs::metadata(source).expect("Failed to stat source");
 
+    // If that didn't work, then copy and rm.
+    let filedata = try!(fs::metadata(source));
     if filedata.is_dir() {
         // Create all directories including the top-level dir, and then
         // skip the top-level dir in WalkDir because it may be renamed
         // due to name collision
         fs::create_dir_all(&dest).expect("Failed to create grave path");
         // Walk the source, creating directories and copying files as needed
-        for entry in WalkDir::new(source).into_iter().skip(1) {
-            let entry = entry.expect("Failed to open file in source dir");
+        for entry in walk_into_dir(source) {
+            let entry = try!(entry);
             let path: &Path = entry.path();
             // Path without the top-level directory
             let orphan: &Path = path.strip_prefix(source).unwrap();
@@ -205,7 +205,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
                 }
             }
         }
-        fs::remove_dir_all(source).expect("Failed to remove source dir");
+        try!(fs::remove_dir_all(source));
     } else if filedata.is_file() {
         let parent = dest.parent().unwrap();
         fs::create_dir_all(parent).expect("Failed to create grave path");
@@ -248,4 +248,9 @@ fn rename_grave(grave: PathBuf) -> PathBuf {
             .next()
             .expect("Failed to rename duplicate file or directory")
     }
+}
+
+/// Return a WalkDir iterator that excludes the top-level directory.
+fn walk_into_dir<P: AsRef<Path>>(path: P) -> std::iter::Skip<walkdir::Iter> {
+    WalkDir::new(path).into_iter().skip(1)
 }
