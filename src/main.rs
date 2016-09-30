@@ -1,4 +1,5 @@
 // -*- compile-command: "cargo build" -*-
+#![feature(io)]
 #![feature(alloc_system)]
 #![feature(core_str_ext)]
 extern crate alloc_system;
@@ -13,7 +14,7 @@ use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::env;
-use std::io::{Write, BufRead, BufReader};
+use std::io::{Read, Write, BufRead, BufReader};
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
@@ -66,6 +67,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             let source = tokens.next().expect("Bad histfile format: column B");
             if let Err(e) = bury(Path::new(source), Path::new(dest)) {
                 println!("ERROR: {}: {}", e, source);
+                println!("Maybe the file was removed from the graveyard.");
+                println!("Do you want to remove it from the history? (y/n)");
+                if read_yes() {
+                    delete_last_line(&histfile).unwrap();
+                }
+
             } else {
                 println!("Returned {} to {}", source, dest);
                 delete_last_line(&histfile).expect("Failed to remove history");
@@ -108,44 +115,6 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         } else if let Err(e) = write_log(&path, &dest, graveyard) {
             println!("Error adding {} to histfile: {}", source, e);
         }
-    }
-}
-
-fn read_last_line(path: &PathBuf) -> std::io::Result<String> {
-    match fs::File::open(path) {
-        Ok(f) => BufReader::new(f)
-            .lines()
-            .last()
-            .expect("Failed to read histfile"),
-        Err(e) => Err(e)
-    }
-}
-
-/// Set the length of the file to the difference between the size of the file
-/// and the size of last line of the file
-fn delete_last_line(path: &PathBuf) -> std::io::Result<()> {
-    match fs::OpenOptions::new().write(true).open(path) {
-        Ok(f) => {
-            let total: u64 = f
-                .metadata()
-                .expect("Failed to stat file")
-                .len();
-            let last_line: usize = read_last_line(path)
-                .unwrap()
-                .bytes()
-                .count();
-            let difference = total - last_line as u64 - 1;
-            // Remove histfile if it would be truncated to 0 to avoid a panic
-            // when reading
-            if difference == 0 {
-                try!(fs::remove_file(path));
-            } else {
-                f.set_len(difference).expect("Failed to truncate file");
-            }
-
-            Ok(())
-        },
-        Err(e) => Err(e)
     }
 }
 
@@ -227,6 +196,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Add a numbered extension to duplicate filenames to avoid overwriting files.
 fn rename_grave(grave: PathBuf) -> PathBuf {
     if grave.extension().is_none() {
         (1_u64..)
@@ -253,4 +223,52 @@ fn rename_grave(grave: PathBuf) -> PathBuf {
 /// Return a WalkDir iterator that excludes the top-level directory.
 fn walk_into_dir<P: AsRef<Path>>(path: P) -> std::iter::Skip<walkdir::Iter> {
     WalkDir::new(path).into_iter().skip(1)
+}
+
+/// Prompt for user input, returning True if the first character is 'y' or 'Y'
+fn read_yes() -> bool {
+    let stdin = std::io::stdin();
+    if let Some(c) = stdin.lock().chars().next() {
+        if let Ok(c) = c {
+            return c == 'y' || c == 'Y';
+        }
+    }
+    false
+}
+
+fn read_last_line(path: &PathBuf) -> std::io::Result<String> {
+    match fs::File::open(path) {
+        Ok(f) => BufReader::new(f)
+            .lines()
+            .last()
+            .expect("Failed to read histfile"),
+        Err(e) => Err(e)
+    }
+}
+
+/// Set the length of the file to the difference between the size of the file
+/// and the size of last line of the file.
+fn delete_last_line(path: &PathBuf) -> std::io::Result<()> {
+    match fs::OpenOptions::new().write(true).open(path) {
+        Ok(f) => {
+            let total: u64 = f
+                .metadata()
+                .expect("Failed to stat file")
+                .len();
+            let last_line: usize = read_last_line(path)
+                .unwrap()
+                .bytes()
+                .count();
+            let difference = total - last_line as u64 - 1;
+            // Remove histfile if it would be truncated to 0 to avoid a panic
+            if difference == 0 {
+                try!(fs::remove_file(path));
+            } else {
+                f.set_len(difference).expect("Failed to truncate file");
+            }
+
+            Ok(())
+        },
+        Err(e) => Err(e)
+    }
 }
