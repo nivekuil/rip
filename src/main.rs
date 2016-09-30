@@ -238,10 +238,7 @@ fn read_yes() -> bool {
 
 fn read_last_line(path: &PathBuf) -> std::io::Result<String> {
     match fs::File::open(path) {
-        Ok(f) => BufReader::new(f)
-            .lines()
-            .last()
-            .expect("Failed to read histfile"),
+        Ok(f) => BufReader::new(f).lines().last().expect("Empty histfile"),
         Err(e) => Err(e)
     }
 }
@@ -251,14 +248,8 @@ fn read_last_line(path: &PathBuf) -> std::io::Result<String> {
 fn delete_last_line(path: &PathBuf) -> std::io::Result<()> {
     match fs::OpenOptions::new().write(true).open(path) {
         Ok(f) => {
-            let total: u64 = f
-                .metadata()
-                .expect("Failed to stat file")
-                .len();
-            let last_line: usize = read_last_line(path)
-                .unwrap()
-                .bytes()
-                .count();
+            let total: u64 = f.metadata().expect("Failed to stat file").len();
+            let last_line: usize = try!(read_last_line(path)).bytes().count();
             let difference = total - last_line as u64 - 1;
             // Remove histfile if it would be truncated to 0 to avoid a panic
             if difference == 0 {
