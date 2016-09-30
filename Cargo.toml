@@ -1,8 +1,8 @@
 [package]
 name = "rm-improved"
-version = "0.5.0"
+version = "0.5.2"
 authors = ["mail@nivekuil.com"]
-description = "A safety-focused alternative to rm."
+description = "rip: a safety-focused alternative to rm."
 repository = "https://github.com/nivekuil/rip"
 license = "GPL-3.0+"
 include = [
