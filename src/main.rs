@@ -226,7 +226,9 @@ fn walk_into_dir<P: AsRef<Path>>(path: P) -> std::iter::Skip<walkdir::Iter> {
 }
 
 /// Prompt for user input, returning True if the first character is 'y' or 'Y'
-fn read_yes() -> bool {
+fn prompt_yes(prompt: &str) -> bool {
+    print!("{} (y/n) ", prompt);
+    std::io::stdout().flush().unwrap();
     let stdin = std::io::stdin();
     if let Some(c) = stdin.lock().chars().next() {
         if let Ok(c) = c {
