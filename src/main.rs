@@ -68,8 +68,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             if let Err(e) = bury(Path::new(source), Path::new(dest)) {
                 println!("ERROR: {}: {}", e, source);
                 println!("Maybe the file was removed from the graveyard.");
-                println!("Do you want to remove it from the history? (y/n)");
-                if read_yes() {
+                if prompt_yes("Remove it from the history?") {
                     delete_last_line(&histfile).unwrap();
                 }
 
@@ -139,7 +138,7 @@ fn write_log(source: &PathBuf, dest: &PathBuf, graveyard: &Path)
 fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
-    if let Ok(_) = fs::rename(source, &dest) {
+    if let Ok(_) = fs::rename(source, dest) {
         return Ok(());
     }
 
@@ -149,7 +148,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
         // Create all directories including the top-level dir, and then
         // skip the top-level dir in WalkDir because it may be renamed
         // due to name collision
-        fs::create_dir_all(&dest).expect("Failed to create grave path");
+        fs::create_dir_all(dest).expect("Failed to create grave path");
         // Walk the source, creating directories and copying files as needed
         for entry in walk_into_dir(source) {
             let entry = try!(entry);
@@ -161,7 +160,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
                     println!("Failed to create {} in {}",
                              path.display(),
                              dest.join(orphan).display());
-                    try!(fs::remove_dir_all(&dest));
+                    try!(fs::remove_dir_all(dest));
                     return Err(e);
                 }
             } else {
@@ -169,7 +168,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
                     println!("Failed to copy {} to {}",
                              path.display(),
                              dest.join(orphan).display());
-                    try!(fs::remove_dir_all(&dest));
+                    try!(fs::remove_dir_all(dest));
                     return Err(e);
                 }
             }
@@ -178,7 +177,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
     } else if filedata.is_file() {
         let parent = dest.parent().unwrap();
         fs::create_dir_all(parent).expect("Failed to create grave path");
-        if let Err(e) = fs::copy(source, &dest) {
+        if let Err(e) = fs::copy(source, dest) {
             println!("Failed to copy {} to {}",
                      source.display(), dest.display());
             return Err(e);
