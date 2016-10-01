@@ -187,8 +187,19 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
             return Err(e);
         }
     } else {
-        println!("Non-regular file or directory: {}", source.display());
-        try!(fs::copy(source, &dest));
+        // Special file: Try copying it as normal, but this probably won't work
+        let parent = dest.parent().unwrap();
+        fs::create_dir_all(parent).expect("Failed to create grave path");
+        if let Err(e) = fs::copy(source, dest) {
+            println!("Non-regular file or directory: {}", source.display());
+            if !prompt_yes("Permanently delete the file?") {
+                return Err(e);
+            }
+            // Create a dummy file to act as a marker in the graveyard
+            let mut marker = try!(fs::File::create(dest));
+            try!(marker.write_all(b"This is a marker for a file that was per\
+                                    manently deleted.  Requiescat in pace."));
+        }
         try!(fs::remove_file(source));
     }
 
