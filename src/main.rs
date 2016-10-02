@@ -51,8 +51,13 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .long("resurrect"))
         .get_matches();
 
-    let graveyard: &Path = Path::new(matches.value_of("graveyard")
-        .unwrap_or(GRAVEYARD));
+    let graveyard: &Path = &PathBuf::from(
+        match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
+            (Some(flag), _) => flag.to_string(),
+            (_, Ok(env)) => env,
+            _ => GRAVEYARD.to_string(),
+        }
+    );
 
     if matches.is_present("decompose") {
         fs::remove_dir_all(graveyard).is_ok();
