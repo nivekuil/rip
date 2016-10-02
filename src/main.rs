@@ -65,8 +65,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 
     if matches.is_present("resurrect") {
-        let histfile: PathBuf = graveyard.join(HISTFILE);
-        if let Ok(s) = read_last_line(&histfile) {
+        let histfile: &Path = &graveyard.join(HISTFILE);
+        if let Ok(s) = read_last_line(histfile) {
             let mut tokens = StrExt::split(s.as_str(), "\t");
             let dest = tokens.next().expect("Bad histfile format: column A");
             let source = tokens.next().expect("Bad histfile format: column B");
@@ -74,12 +74,11 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                 println!("ERROR: {}: {}", e, source);
                 println!("Maybe the file was removed from the graveyard.");
                 if prompt_yes("Remove it from the history?") {
-                    delete_last_line(&histfile).unwrap();
+                    delete_last_line(histfile).unwrap();
                 }
-
             } else {
                 println!("Returned {} to {}", source, dest);
-                delete_last_line(&histfile).expect("Failed to remove history");
+                delete_last_line(histfile).expect("Failed to remove history");
             }
         }
         return;
@@ -253,7 +252,7 @@ fn prompt_yes(prompt: &str) -> bool {
     false
 }
 
-fn read_last_line(path: &PathBuf) -> std::io::Result<String> {
+fn read_last_line(path: &Path) -> std::io::Result<String> {
     match fs::File::open(path) {
         Ok(f) => BufReader::new(f).lines().last().expect("Empty histfile"),
         Err(e) => Err(e)
@@ -262,7 +261,7 @@ fn read_last_line(path: &PathBuf) -> std::io::Result<String> {
 
 /// Set the length of the file to the difference between the size of the file
 /// and the size of last line of the file.
-fn delete_last_line(path: &PathBuf) -> std::io::Result<()> {
+fn delete_last_line(path: &Path) -> std::io::Result<()> {
     match fs::OpenOptions::new().write(true).open(path) {
         Ok(f) => {
             let total: u64 = f.metadata().expect("Failed to stat file").len();
