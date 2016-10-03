@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::env;
 use std::io::{Read, Write, BufRead, BufReader};
+use std::os::unix::fs::FileTypeExt;
+use std::process::Command;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
@@ -193,6 +195,9 @@ fn copy_file(filetype: fs::FileType, source: &Path, dest: &Path)
             println!("Failed to remove {}", source.display());
             return Err(e);
         }
+    } else if filetype.is_fifo() {
+        try!(Command::new("mkfifo").arg(dest).output());
+        try!(fs::remove_file(source));
     } else {
         // Special file: Try copying it as normal, but this probably won't work
         let parent = dest.parent().unwrap();
@@ -237,7 +242,15 @@ fn rename_grave(grave: PathBuf) -> PathBuf {
     }
 }
 
-/// Return a WalkDir iterator that excludes the top-level directory.
+// fn warn_big_file(filedata: fs::Metadata) -> bool {
+//     let threshold = 500000000;
+//     if filedata.size() > threshold {
+//         println!("About to copy a big file (> 500MB) {}", filedata.);
+//         return prompt_yes("Permanently delete this file instead?")
+//     }
+// }
+
+/// return a WalkDir iterator that excludes the top-level directory.
 fn walk_into_dir<P: AsRef<Path>>(path: P) -> std::iter::Skip<walkdir::Iter> {
     WalkDir::new(path).into_iter().skip(1)
 }
