@@ -21,20 +21,18 @@ use std::process::Command;
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
 
+// todo: action enum, resurrect with filename
+
 fn main() {
     let matches = App::with_defaults("rip")
         .version(crate_version!())
         .author(crate_authors!())
         .about("Rm ImProved
 Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
-        .arg(Arg::with_name("SOURCE")
+        .arg(Arg::with_name("target")
              .help("File or directory to remove")
-             .required(true)
              .multiple(true)
-             .index(1)
-             .conflicts_with("decompose")
-             .conflicts_with("seance")
-             .conflicts_with("resurrect"))
+             .index(1))
         .arg(Arg::with_name("graveyard")
              .help("Directory where deleted files go to rest")
              .long("graveyard")
@@ -103,28 +101,32 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
-    for source in matches.values_of("SOURCE").unwrap() {
-        let path: PathBuf = cwd.join(Path::new(source));
-        if !path.exists() {
-            println!("Cannot remove {}: no such file or directory",
-                     path.display());
-            return;
-        }
-        let dest: PathBuf = {
+    if let Some(targets) = matches.values_of("target") {
+        for target in targets {
+            let path: PathBuf = cwd.join(Path::new(target));
+            if !path.exists() {
+                println!("Cannot remove {}: no such file or directory",
+                         path.display());
+                return;
+            }
             // Can't join absolute paths, so we need to strip the leading "/"
-            let grave = graveyard.join(path.strip_prefix("/").unwrap());
-            if grave.exists() { rename_grave(grave) } else { grave }
-        };
-        if let Err(e) = bury(&path, &dest) {
-            println!("ERROR: {}: {}", e, source);
-        } else if let Err(e) = write_log(&path, &dest, graveyard) {
-            println!("Error adding {} to histfile: {}", source, e);
+            let dest: PathBuf = {
+                let grave = graveyard.join(path.strip_prefix("/").unwrap());
+                if grave.exists() { rename_grave(grave) } else { grave }
+            };
+            if let Err(e) = bury(&path, &dest) {
+                println!("ERROR: {}: {}", e, target);
+            } else if let Err(e) = write_log(&path, &dest, graveyard, "BURY") {
+                println!("Error adding {} to histfile: {}", target, e);
+            }
         }
+    } else {
+        println!("{}\nrip -h for help", matches.usage());
     }
 }
 
-/// Write deletion history to HISTFILE in the format "SOURCEPATH\tGRAVEPATH\n".
-fn write_log(source: &PathBuf, dest: &PathBuf, graveyard: &Path)
+/// Write deletion history to HISTFILE
+fn write_log(source: &PathBuf, dest: &PathBuf, graveyard: &Path, action: &str)
              -> std::io::Result<()> {
     let histfile = graveyard.join(HISTFILE);
     {
@@ -132,10 +134,12 @@ fn write_log(source: &PathBuf, dest: &PathBuf, graveyard: &Path)
                          .create(true)
                          .append(true)
                          .open(histfile));
-        try!(f.write_all(format!("{}\t{}\n",
-                                 source.to_str().unwrap(),
-                                 dest.to_str().unwrap())
-                         .as_bytes()));
+        try!(f.write_all(
+            format!("{}\t{}\t{}\n",
+                    action,
+                    source.to_str().unwrap(),
+                    dest.to_str().unwrap(),
+            ).as_bytes()));
     }
 
     Ok(())
