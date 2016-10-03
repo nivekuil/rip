@@ -29,7 +29,7 @@ fn main() {
         .author(crate_authors!())
         .about("Rm ImProved
 Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
-        .arg(Arg::with_name("target")
+        .arg(Arg::with_name("TARGET")
              .help("File or directory to remove")
              .multiple(true)
              .index(1))
@@ -101,7 +101,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
-    if let Some(targets) = matches.values_of("target") {
+    if let Some(targets) = matches.values_of("TARGET") {
         for target in targets {
             let path: PathBuf = cwd.join(Path::new(target));
             if !path.exists() {
