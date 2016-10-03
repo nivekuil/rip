@@ -147,8 +147,8 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
     }
 
     // If that didn't work, then copy and rm.
-    let filedata = try!(fs::metadata(source));
-    if filedata.is_dir() {
+    let filetype = try!(fs::metadata(source)).file_type();
+    if filetype.is_dir() {
         // Create all directories including the top-level dir, and then
         // skip the top-level dir in WalkDir because it may be renamed
         // due to name collision
@@ -168,17 +168,20 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
                     return Err(e);
                 }
             } else {
-                if let Err(e) = fs::copy(path, dest.join(orphan)) {
-                    println!("Failed to copy {} to {}",
-                             path.display(),
-                             dest.join(orphan).display());
-                    try!(fs::remove_dir_all(dest));
-                    return Err(e);
-                }
+                try!(copy_file(filetype, path, dest.join(orphan).as_path()));
             }
         }
         try!(fs::remove_dir_all(source));
-    } else if filedata.is_file() {
+    } else {
+        try!(copy_file(filetype, source, dest));
+    }
+
+    Ok(())
+}
+
+fn copy_file(filetype: fs::FileType, source: &Path, dest: &Path)
+             -> std::io::Result<()> {
+    if filetype.is_file() {
         let parent = dest.parent().unwrap();
         fs::create_dir_all(parent).expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, dest) {
