@@ -38,6 +38,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .takes_value(true))
         .arg(Arg::with_name("decompose")
              .help("Permanently delete (unlink) the entire graveyard")
+             .short("d")
              .long("decompose"))
         .arg(Arg::with_name("seance")
              .help("List all objects in the graveyard that were sent from the \
@@ -59,7 +60,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     );
 
     if matches.is_present("decompose") {
-        fs::remove_dir_all(graveyard).is_ok();
+        if prompt_yes("Really unlink the entire graveyard?"){
+            fs::remove_dir_all(graveyard).is_ok();
+        }
         return;
     }
 
