@@ -21,8 +21,6 @@ use std::process::Command;
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
 
-// todo: action enum, resurrect with filename
-
 fn main() {
     let matches = App::with_defaults("rip")
         .version(crate_version!())
@@ -66,19 +64,27 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     if matches.is_present("resurrect") {
         let histfile: &Path = &graveyard.join(HISTFILE);
-        if let Ok(s) = read_last_line(histfile) {
+        if let Ok(s) = get_last_bury(histfile, graveyard) {
+            if s.len() == 0 {
+                return;
+            }
             let mut tokens = StrExt::split(s.as_str(), "\t");
-            let dest = tokens.next().expect("Bad histfile format: column A");
-            let source = tokens.next().expect("Bad histfile format: column B");
-            if let Err(e) = bury(Path::new(source), Path::new(dest)) {
-                println!("ERROR: {}: {}", e, source);
+            let orig = tokens.next().expect("Bad histfile format: column A");
+            let grave = tokens.next().expect("Bad histfile format: column B");
+            let source = Path::new(grave);
+            let dest = Path::new(orig);
+            if let Err(e) = bury(source, dest) {
+                println!("ERROR: {}: {}", e, source.display());
                 println!("Maybe the file was removed from the graveyard.");
-                if prompt_yes("Remove it from the history?") {
-                    delete_last_line(histfile).unwrap();
-                }
+                // if prompt_yes("Remove it from the history?") {
+                //     delete_last_line(histfile).unwrap();
+                // }
+            } else if let Err(e) = write_log(source, dest, graveyard) {
+                println!("Error adding {} to histfile: {}", source.display(),
+                         e);
             } else {
-                println!("Returned {} to {}", source, dest);
-                delete_last_line(histfile).expect("Failed to remove history");
+                println!("Returned {} to {}", source.display(), dest.display());
+
             }
         }
         return;
@@ -116,7 +122,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             };
             if let Err(e) = bury(&path, &dest) {
                 println!("ERROR: {}: {}", e, target);
-            } else if let Err(e) = write_log(&path, &dest, graveyard, "BURY") {
+            } else if let Err(e) = write_log(&path, &dest, graveyard) {
                 println!("Error adding {} to histfile: {}", target, e);
             }
         }
@@ -126,7 +132,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 }
 
 /// Write deletion history to HISTFILE
-fn write_log(source: &PathBuf, dest: &PathBuf, graveyard: &Path, action: &str)
+fn write_log(source: &Path, dest: &Path, graveyard: &Path)
              -> std::io::Result<()> {
     let histfile = graveyard.join(HISTFILE);
     {
@@ -135,8 +141,7 @@ fn write_log(source: &PathBuf, dest: &PathBuf, graveyard: &Path, action: &str)
                          .append(true)
                          .open(histfile));
         try!(f.write_all(
-            format!("{}\t{}\t{}\n",
-                    action,
+            format!("{}\t{}\n",
                     source.to_str().unwrap(),
                     dest.to_str().unwrap(),
             ).as_bytes()));
@@ -272,29 +277,34 @@ fn prompt_yes(prompt: &str) -> bool {
     false
 }
 
-fn read_last_line(path: &Path) -> std::io::Result<String> {
+fn get_last_bury(path: &Path, graveyard: &Path) -> std::io::Result<String> {
     match fs::File::open(path) {
-        Ok(f) => BufReader::new(f).lines().last().expect("Empty histfile"),
-        Err(e) => Err(e)
-    }
-}
-
-/// Set the length of the file to the difference between the size of the file
-/// and the size of last line of the file.
-fn delete_last_line(path: &Path) -> std::io::Result<()> {
-    match fs::OpenOptions::new().write(true).open(path) {
         Ok(f) => {
-            let total: u64 = f.metadata().expect("Failed to stat file").len();
-            let last_line: usize = try!(read_last_line(path)).bytes().count();
-            let difference = total - last_line as u64 - 1;
-            // Remove histfile if it would be truncated to 0 to avoid a panic
-            if difference == 0 {
-                try!(fs::remove_file(path));
-            } else {
-                f.set_len(difference).expect("Failed to truncate file");
-            }
+            let lines: Vec<String> = BufReader::new(f)
+                .lines()
+                .map(|line| line.unwrap())
+                .collect();
 
-            Ok(())
+            let mut stack: Vec<&str> = Vec::new();
+            for line in lines.iter().rev() {
+                let mut tokens = StrExt::split(line.as_str(), "\t");
+                let orig: &str = tokens.next().expect("Bad format: column A");
+                let grave: &str = tokens.next().expect("Bad format: column B");
+
+                // Check if this is a resurrect.  If it is, then add the orig
+                // file onto the stack to match with the last buried
+                if Path::new(orig).starts_with(graveyard) {
+                    stack.push(orig);
+                } else {
+                    if let Some(p) = stack.pop() {
+                        if p == grave { continue }
+                    }
+                    // If the top of the resurrect stack does not match the
+                    // buried item, then assume it's still in the graveyard
+                    return Ok(line.clone())
+                }
+            }
+            return Ok(String::from(""));
         },
         Err(e) => Err(e)
     }
