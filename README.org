@@ -1,4 +1,6 @@
 * rip (Rm ImProved)
+[[https://crates.io/crates/rm-improved][https://img.shields.io/crates/v/rm-improved.svg]]
+
 Deleted files get sent to the graveyard (=/tmp/.graveyard= by default, under their absolute path) instead of being unlinked, giving you a chance to recover them.
 
 No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
