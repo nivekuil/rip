@@ -128,6 +128,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     } else {
         println!("{}\nrip -h for help", matches.usage());
     }
+
 }
 
 /// Write deletion history to HISTFILE
@@ -185,6 +186,7 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
         try!(fs::remove_dir_all(source));
     } else {
         try!(copy_file(filetype, source, dest));
+        try!(fs::remove_file(source));
     }
 
     Ok(())
@@ -192,25 +194,19 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
 
 fn copy_file(filetype: fs::FileType, source: &Path, dest: &Path)
              -> io::Result<()> {
+    let parent = dest.parent().unwrap();
+    fs::create_dir_all(parent).expect("Failed to create grave path");
     if filetype.is_file() {
-        let parent = dest.parent().unwrap();
         fs::create_dir_all(parent).expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, dest) {
             println!("Failed to copy {} to {}",
                      source.display(), dest.display());
             return Err(e);
         }
-        if let Err(e) = fs::remove_file(source) {
-            println!("Failed to remove {}", source.display());
-            return Err(e);
-        }
     } else if filetype.is_fifo() {
         try!(Command::new("mkfifo").arg(dest).output());
-        try!(fs::remove_file(source));
     } else {
         // Special file: Try copying it as normal, but this probably won't work
-        let parent = dest.parent().unwrap();
-        fs::create_dir_all(parent).expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, dest) {
             println!("Non-regular file or directory: {}", source.display());
             if !prompt_yes("Permanently delete the file?") {
@@ -221,7 +217,6 @@ fn copy_file(filetype: fs::FileType, source: &Path, dest: &Path)
             try!(marker.write_all(b"This is a marker for a file that was per\
                                     manently deleted.  Requiescat in pace."));
         }
-        try!(fs::remove_file(source));
     }
 
     Ok(())
