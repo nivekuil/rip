@@ -16,8 +16,10 @@ use std::fs;
 use std::env;
 use std::io;
 use std::io::{Read, Write, BufRead, BufReader};
-use std::os::unix::fs::FileTypeExt;
 use std::process::Command;
+use std::os::unix::fs::FileTypeExt;
+use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::PermissionsExt;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
@@ -104,6 +106,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 
     if cwd.starts_with(graveyard) {
+        // Not addressed: if you try to rip graveyard, it'll break very loudly
         println!("You should use rm to delete files in the graveyard, \
                   or --decompose to delete everything at once.");
         return;
@@ -131,7 +134,10 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     } else {
         println!("{}\nrip -h for help", matches.usage());
     }
-
+    // Ensure graveyard has the correct permissions
+    let mut permissions = graveyard.metadata().unwrap().permissions();
+    permissions.set_mode(0o777);
+    fs::set_permissions(graveyard, permissions).unwrap();
 }
 
 /// Write deletion history to HISTFILE
@@ -142,6 +148,7 @@ fn write_log(source: &Path, dest: &Path, graveyard: &Path)
         let mut f = try!(fs::OpenOptions::new()
                          .create(true)
                          .append(true)
+                         .mode(0o666)
                          .open(histfile));
         try!(f.write_all(
             format!("{}\t{}\t{}\n",
@@ -275,6 +282,8 @@ fn prompt_yes(prompt: &str) -> bool {
     false
 }
 
+/// Return the line in histfile corresponding to the last buried file still in
+/// the graveyard
 fn get_last_bury(path: &Path, graveyard: &Path) -> io::Result<String> {
     match fs::File::open(path) {
         Ok(f) => {
