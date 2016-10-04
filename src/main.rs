@@ -146,9 +146,9 @@ fn write_log(source: &Path, dest: &Path, graveyard: &Path)
     let histfile = graveyard.join(HISTFILE);
     {
         let mut f = try!(fs::OpenOptions::new()
+                         .mode(0o666)
                          .create(true)
                          .append(true)
-                         .mode(0o666)
                          .open(histfile));
         try!(f.write_all(
             format!("{}\t{}\t{}\n",
