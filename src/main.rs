@@ -14,6 +14,7 @@ use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::env;
+use std::io;
 use std::io::{Read, Write, BufRead, BufReader};
 use std::os::unix::fs::FileTypeExt;
 use std::process::Command;
@@ -65,12 +66,10 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     if matches.is_present("resurrect") {
         let histfile: &Path = &graveyard.join(HISTFILE);
         if let Ok(s) = get_last_bury(histfile, graveyard) {
-            if s.len() == 0 {
-                return;
-            }
             let mut tokens = StrExt::split(s.as_str(), "\t");
-            let orig = tokens.next().expect("Bad histfile format: column A");
-            let grave = tokens.next().expect("Bad histfile format: column B");
+            let _ = tokens.next().expect("Bad histfile format: column A");
+            let orig = tokens.next().expect("Bad histfile format: column B");
+            let grave = tokens.next().expect("Bad histfile format: column C");
             let source = Path::new(grave);
             let dest = Path::new(orig);
             if let Err(e) = bury(source, dest) {
@@ -80,11 +79,11 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                 //     delete_last_line(histfile).unwrap();
                 // }
             } else if let Err(e) = write_log(source, dest, graveyard) {
-                println!("Error adding {} to histfile: {}", source.display(),
-                         e);
+                println!("Error adding {} to histfile: {}",
+                         source.display(), e);
             } else {
-                println!("Returned {} to {}", source.display(), dest.display());
-
+                println!("Returned {} to {}",
+                         source.display(), dest.display());
             }
         }
         return;
@@ -133,7 +132,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
 /// Write deletion history to HISTFILE
 fn write_log(source: &Path, dest: &Path, graveyard: &Path)
-             -> std::io::Result<()> {
+             -> io::Result<()> {
     let histfile = graveyard.join(HISTFILE);
     {
         let mut f = try!(fs::OpenOptions::new()
@@ -141,7 +140,8 @@ fn write_log(source: &Path, dest: &Path, graveyard: &Path)
                          .append(true)
                          .open(histfile));
         try!(f.write_all(
-            format!("{}\t{}\n",
+            format!("{}\t{}\t{}\n",
+                    get_user(),
                     source.to_str().unwrap(),
                     dest.to_str().unwrap(),
             ).as_bytes()));
@@ -150,7 +150,7 @@ fn write_log(source: &Path, dest: &Path, graveyard: &Path)
     Ok(())
 }
 
-fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
+fn bury(source: &Path, dest: &Path) -> io::Result<()> {
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
     if let Ok(_) = fs::rename(source, dest) {
@@ -191,7 +191,7 @@ fn bury(source: &Path, dest: &Path) -> std::io::Result<()> {
 }
 
 fn copy_file(filetype: fs::FileType, source: &Path, dest: &Path)
-             -> std::io::Result<()> {
+             -> io::Result<()> {
     if filetype.is_file() {
         let parent = dest.parent().unwrap();
         fs::create_dir_all(parent).expect("Failed to create grave path");
@@ -254,7 +254,7 @@ fn rename_grave(grave: PathBuf) -> PathBuf {
 // fn warn_big_file(filedata: fs::Metadata) -> bool {
 //     let threshold = 500000000;
 //     if filedata.size() > threshold {
-//         println!("About to copy a big file (> 500MB) {}", filedata.);
+//         println!("About to copy a big file ({} bytes}", filedata.len());
 //         return prompt_yes("Permanently delete this file instead?")
 //     }
 // }
@@ -267,8 +267,8 @@ fn walk_into_dir<P: AsRef<Path>>(path: P) -> std::iter::Skip<walkdir::Iter> {
 /// Prompt for user input, returning True if the first character is 'y' or 'Y'
 fn prompt_yes(prompt: &str) -> bool {
     print!("{} (y/n) ", prompt);
-    std::io::stdout().flush().unwrap();
-    let stdin = std::io::stdin();
+    io::stdout().flush().unwrap();
+    let stdin = io::stdin();
     if let Some(c) = stdin.lock().chars().next() {
         if let Ok(c) = c {
             return c == 'y' || c == 'Y';
@@ -277,7 +277,7 @@ fn prompt_yes(prompt: &str) -> bool {
     false
 }
 
-fn get_last_bury(path: &Path, graveyard: &Path) -> std::io::Result<String> {
+fn get_last_bury(path: &Path, graveyard: &Path) -> io::Result<String> {
     match fs::File::open(path) {
         Ok(f) => {
             let lines: Vec<String> = BufReader::new(f)
@@ -288,9 +288,12 @@ fn get_last_bury(path: &Path, graveyard: &Path) -> std::io::Result<String> {
             let mut stack: Vec<&str> = Vec::new();
             for line in lines.iter().rev() {
                 let mut tokens = StrExt::split(line.as_str(), "\t");
-                let orig: &str = tokens.next().expect("Bad format: column A");
-                let grave: &str = tokens.next().expect("Bad format: column B");
+                let user: &str = tokens.next().expect("Bad format: column A");
+                let orig: &str = tokens.next().expect("Bad format: column B");
+                let grave: &str = tokens.next().expect("Bad format: column C");
 
+                // Only resurrect files buried by the same user
+                if user != get_user() { continue }
                 // Check if this is a resurrect.  If it is, then add the orig
                 // file onto the stack to match with the last buried
                 if Path::new(orig).starts_with(graveyard) {
@@ -304,8 +307,12 @@ fn get_last_bury(path: &Path, graveyard: &Path) -> std::io::Result<String> {
                     return Ok(line.clone())
                 }
             }
-            return Ok(String::from(""));
+            return Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
         },
         Err(e) => Err(e)
     }
+}
+
+fn get_user() -> String {
+    env::var("USER").unwrap_or(String::from("unknown"))
 }
