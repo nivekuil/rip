@@ -7,6 +7,7 @@ extern crate alloc_system;
 extern crate clap;
 extern crate core;
 extern crate walkdir;
+extern crate libc;
 
 use clap::{Arg, App};
 use core::str::StrExt;
@@ -19,11 +20,11 @@ use std::io::{Read, Write, BufRead, BufReader};
 use std::process::Command;
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::DirBuilderExt;
+use libc::umask;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
-
 fn main() {
     let matches = App::with_defaults("rip")
         .version(crate_version!())
@@ -112,6 +113,10 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
+    unsafe {
+        umask(0);
+    }
+
     if let Some(targets) = matches.values_of("TARGET") {
         for target in targets {
             let path: PathBuf = cwd.join(Path::new(target));
@@ -134,10 +139,6 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     } else {
         println!("{}\nrip -h for help", matches.usage());
     }
-    // Ensure graveyard has the correct permissions
-    let mut permissions = graveyard.metadata().unwrap().permissions();
-    permissions.set_mode(0o777);
-    fs::set_permissions(graveyard, permissions).unwrap();
 }
 
 /// Write deletion history to HISTFILE
@@ -171,10 +172,6 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
     // If that didn't work, then copy and rm.
     let filetype = try!(fs::metadata(source)).file_type();
     if filetype.is_dir() {
-        // Create all directories including the top-level dir, and then
-        // skip the top-level dir in WalkDir because it may be renamed
-        // due to name collision
-        fs::create_dir_all(dest).expect("Failed to create grave path");
         // Walk the source, creating directories and copying files as needed
         for entry in walk_into_dir(source) {
             let entry = try!(entry);
@@ -182,7 +179,11 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
             // Path without the top-level directory
             let orphan: &Path = path.strip_prefix(source).unwrap();
             if path.is_dir() {
-                if let Err(e) = fs::create_dir(dest.join(orphan)) {
+                let dir = fs::DirBuilder::new()
+                    .mode(0o777)
+                    .recursive(true)
+                    .create(path);
+                if let Err(e) = dir {
                     println!("Failed to create {} in {}",
                              path.display(),
                              dest.join(orphan).display());
@@ -195,6 +196,8 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
         }
         try!(fs::remove_dir_all(source));
     } else {
+        let parent = dest.parent().unwrap();
+        try!(fs::DirBuilder::new().mode(0o777).recursive(true).create(parent));
         try!(copy_file(filetype, source, dest));
         try!(fs::remove_file(source));
     }
@@ -204,10 +207,7 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
 
 fn copy_file(filetype: fs::FileType, source: &Path, dest: &Path)
              -> io::Result<()> {
-    let parent = dest.parent().unwrap();
-    fs::create_dir_all(parent).expect("Failed to create grave path");
     if filetype.is_file() {
-        fs::create_dir_all(parent).expect("Failed to create grave path");
         if let Err(e) = fs::copy(source, dest) {
             println!("Failed to copy {} to {}",
                      source.display(), dest.display());
