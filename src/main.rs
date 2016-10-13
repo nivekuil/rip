@@ -170,19 +170,19 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
     }
 
     // If that didn't work, then copy and rm.
-    let filetype = try!(fs::metadata(source)).file_type();
-    if filetype.is_dir() {
+    if try!(fs::metadata(source)).is_dir() {
         // Walk the source, creating directories and copying files as needed
-        for entry in walk_into_dir(source) {
+        for entry in WalkDir::new(source).into_iter() {
             let entry = try!(entry);
             let path: &Path = entry.path();
             // Path without the top-level directory
             let orphan: &Path = path.strip_prefix(source).unwrap();
+
             if path.is_dir() {
                 let dir = fs::DirBuilder::new()
                     .mode(0o777)
                     .recursive(true)
-                    .create(path);
+                    .create(dest.join(orphan));
                 if let Err(e) = dir {
                     println!("Failed to create {} in {}",
                              path.display(),
@@ -191,22 +191,22 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
                     return Err(e);
                 }
             } else {
-                try!(copy_file(filetype, path, dest.join(orphan).as_path()));
+                try!(copy_file(path, dest.join(orphan).as_path()));
             }
         }
         try!(fs::remove_dir_all(source));
     } else {
-        let parent = dest.parent().unwrap();
+        let parent = dest.parent().expect("A file without a parent?");
         try!(fs::DirBuilder::new().mode(0o777).recursive(true).create(parent));
-        try!(copy_file(filetype, source, dest));
+        try!(copy_file(source, dest));
         try!(fs::remove_file(source));
     }
 
     Ok(())
 }
 
-fn copy_file(filetype: fs::FileType, source: &Path, dest: &Path)
-             -> io::Result<()> {
+fn copy_file(source: &Path, dest: &Path) -> io::Result<()> {
+    let filetype = try!(fs::metadata(source)).file_type();
     if filetype.is_file() {
         if let Err(e) = fs::copy(source, dest) {
             println!("Failed to copy {} to {}",
