@@ -170,7 +170,7 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
     }
 
     // If that didn't work, then copy and rm.
-    if try!(fs::metadata(source)).is_dir() {
+    if try!(fs::symlink_metadata(source)).is_dir() {
         // Walk the source, creating directories and copying files as needed
         for entry in WalkDir::new(source).into_iter() {
             let entry = try!(entry);
@@ -206,7 +206,7 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
 }
 
 fn copy_file(source: &Path, dest: &Path) -> io::Result<()> {
-    let filetype = try!(fs::metadata(source)).file_type();
+    let filetype = try!(fs::symlink_metadata(source)).file_type();
     if filetype.is_file() {
         if let Err(e) = fs::copy(source, dest) {
             println!("Failed to copy {} to {}",
@@ -215,6 +215,9 @@ fn copy_file(source: &Path, dest: &Path) -> io::Result<()> {
         }
     } else if filetype.is_fifo() {
         try!(Command::new("mkfifo").arg(dest).output());
+    } else if filetype.is_symlink() {
+        let target = try!(fs::read_link(source));
+        try!(std::os::unix::fs::symlink(target, dest));
     } else {
         // Special file: Try copying it as normal, but this probably won't work
         if let Err(e) = fs::copy(source, dest) {
@@ -291,8 +294,8 @@ fn get_last_bury(path: &Path, graveyard: &Path) -> io::Result<String> {
                 .lines()
                 .map(|line| line.unwrap())
                 .collect();
-
             let mut stack: Vec<&str> = Vec::new();
+
             for line in lines.iter().rev() {
                 let mut tokens = StrExt::split(line.as_str(), "\t");
                 let user: &str = tokens.next().expect("Bad format: column A");
