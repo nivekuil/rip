@@ -113,6 +113,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
+    // Disable umask so rip can create a globally writable graveyard
     unsafe {
         umask(0);
     }
@@ -121,9 +122,13 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         for target in targets {
             let path: PathBuf = cwd.join(Path::new(target));
             if !path.exists() {
-                println!("Cannot remove {}: no such file or directory",
-                         path.display());
-                return;
+                // exists() follows symlinks, so if path doesn't seem to exist
+                // fstat it to check whether the path points to a symlink
+                if let Err(_) = path.symlink_metadata() {
+                    println!("Cannot remove {}: no such file or directory",
+                             path.display());
+                    return;
+                }
             }
             // Can't join absolute paths, so we need to strip the leading "/"
             let dest: PathBuf = {
