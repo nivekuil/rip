@@ -219,12 +219,10 @@ fn copy_file(source: &Path, dest: &Path) -> io::Result<()> {
             return Err(e);
         }
     } else if filetype.is_fifo() {
-        let path = std::ffi::CString::new(dest.to_str().unwrap())
-            .unwrap()
-            .as_ptr();
+        let path = std::ffi::CString::new(dest.to_str().unwrap()).unwrap();
         let mode = metadata.permissions().mode();
         unsafe {
-            libc::mkfifo(path, mode);
+            libc::mkfifo(path.as_ptr(), mode);
         }
     } else if filetype.is_symlink() {
         let target = try!(fs::read_link(source));
