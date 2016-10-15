@@ -17,11 +17,10 @@ use std::fs;
 use std::env;
 use std::io;
 use std::io::{Read, Write, BufRead, BufReader};
-use std::process::Command;
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::fs::DirBuilderExt;
-use libc::umask;
+use std::os::unix::fs::PermissionsExt;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
@@ -115,7 +114,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     // Disable umask so rip can create a globally writable graveyard
     unsafe {
-        umask(0);
+        libc::umask(0);
     }
 
     if let Some(targets) = matches.values_of("TARGET") {
@@ -211,7 +210,8 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
 }
 
 fn copy_file(source: &Path, dest: &Path) -> io::Result<()> {
-    let filetype = try!(fs::symlink_metadata(source)).file_type();
+    let metadata = try!(fs::symlink_metadata(source));
+    let filetype = metadata.file_type();
     if filetype.is_file() {
         if let Err(e) = fs::copy(source, dest) {
             println!("Failed to copy {} to {}",
@@ -219,7 +219,13 @@ fn copy_file(source: &Path, dest: &Path) -> io::Result<()> {
             return Err(e);
         }
     } else if filetype.is_fifo() {
-        try!(Command::new("mkfifo").arg(dest).output());
+        let path = std::ffi::CString::new(dest.to_str().unwrap())
+            .unwrap()
+            .as_ptr();
+        let mode = metadata.permissions().mode();
+        unsafe {
+            libc::mkfifo(path, mode);
+        }
     } else if filetype.is_symlink() {
         let target = try!(fs::read_link(source));
         try!(std::os::unix::fs::symlink(target, dest));
