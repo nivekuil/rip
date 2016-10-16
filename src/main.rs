@@ -90,7 +90,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             };
             if let Err(e) = bury(grave, dest) {
                 println!("ERROR: {}: {}", e, grave);
-            } else if let Err(e) = write_log(grave, dest, graveyard) {
+            } else if let Err(e) = write_log(grave, dest, histfile) {
                 println!("Error adding {} to histfile: {}", grave, e);
             } else {
                 println!("Returned {} to {}", grave, dest.display());
