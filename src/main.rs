@@ -24,6 +24,7 @@ use std::os::unix::fs::PermissionsExt;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
+
 fn main() {
     let matches = App::with_defaults("rip")
         .version(crate_version!())
@@ -173,6 +174,8 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
         return Ok(());
     }
 
+    let parent = dest.parent().expect("Trying to delete root?");
+    try!(fs::DirBuilder::new().mode(0o777).recursive(true).create(parent));
     // If that didn't work, then copy and rm.
     if try!(fs::symlink_metadata(source)).is_dir() {
         // Walk the source, creating directories and copying files as needed
@@ -181,13 +184,11 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
             let path: &Path = entry.path();
             // Path without the top-level directory
             let orphan: &Path = path.strip_prefix(source).unwrap();
-
             if path.is_dir() {
-                let dir = fs::DirBuilder::new()
-                    .mode(0o777)
-                    .recursive(true)
-                    .create(dest.join(orphan));
-                if let Err(e) = dir {
+                let mode = try!(fs::metadata(path)).permissions().mode();
+                if let Err(e) = fs::DirBuilder::new()
+                    .mode(mode)
+                    .create(dest.join(orphan)) {
                     println!("Failed to create {} in {}",
                              path.display(),
                              dest.join(orphan).display());
@@ -200,8 +201,6 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
         }
         try!(fs::remove_dir_all(source));
     } else {
-        let parent = dest.parent().expect("A file without a parent?");
-        try!(fs::DirBuilder::new().mode(0o777).recursive(true).create(parent));
         try!(copy_file(source, dest));
         try!(fs::remove_file(source));
     }
@@ -296,8 +295,8 @@ fn prompt_yes(prompt: &str) -> bool {
 
 /// Return the line in histfile corresponding to the last buried file still in
 /// the graveyard
-fn get_last_bury(path: &Path, graveyard: &Path) -> io::Result<String> {
-    match fs::File::open(path) {
+fn get_last_bury(histfile: &Path, graveyard: &Path) -> io::Result<String> {
+    match fs::File::open(histfile) {
         Ok(f) => {
             let lines: Vec<String> = BufReader::new(f)
                 .lines()
