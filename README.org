@@ -8,7 +8,7 @@ No data is overwritten.  If files that share the same path are deleted, they wil
 If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
 1. Alias =rip= to =rip --graveyard ~/.local/share/Trash=
 2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=
-This can be a good idea because if the graveyard is in a tmpfs mount, deleting large files can quickly fill up your RAM.  It's also much slower to move files across filesystems, although the delay should be minimal with an SSD.
+This can be a good idea because if the graveyard is mounted on an in-memory filesystem, (as /tmp is in Arch Linux), deleting large files can quickly fill up your RAM.  It's also much slower to move files across filesystems, although the delay should be minimal with an SSD.
 
 A deletion log is kept in =.rip_history=, found in the top level of the graveyard.
 
@@ -18,12 +18,12 @@ Get a binary [[https://github.com/nivekuil/rip/releases][release]] (x86_64) or b
 ** Usage
 #+BEGIN_EXAMPLE
 USAGE:
-    rip [FLAGS] [OPTIONS] <SOURCE>...
+    rip [FLAGS] [OPTIONS] [TARGET]...
 
 FLAGS:
-        --decompose    Permanently delete (unlink) the entire graveyard
+    -d, --decompose    Permanently delete (unlink) the entire graveyard
     -h, --help         Prints help information
-    -r, --resurrect    Undo the last deletion
+    -r, --resurrect    Undo the last removal by the current user
     -s, --seance       List all objects in the graveyard that were sent from the current directory
     -V, --version      Prints version information
 
@@ -31,8 +31,10 @@ OPTIONS:
         --graveyard <graveyard>    Directory where deleted files go to rest
 
 ARGS:
-    <SOURCE>...    File or directory to remove
+    <TARGET>...    File or directory to remove
 #+END_EXAMPLE
+
+In general, a deletion followed by a =--resurrect= should be idempotent.
 
 *** Why is there no =--interactive= option?
 Asking for forgiveness is easier than asking for permission.
