@@ -1,7 +1,6 @@
 // -*- compile-command: "cargo build" -*-
 #![feature(io)]
 #![feature(alloc_system)]
-#![feature(core_str_ext)]
 extern crate alloc_system;
 #[macro_use]
 extern crate clap;
@@ -10,7 +9,6 @@ extern crate walkdir;
 extern crate libc;
 
 use clap::{Arg, App};
-use core::str::StrExt;
 use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
 use std::fs;
@@ -77,7 +75,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     if matches.is_present("resurrect") {
         if let Ok(s) = get_last_bury(histfile, graveyard) {
-            let mut tokens = StrExt::split(s.as_str(), "\t");
+            let mut tokens = s.split("\t");
             tokens.next().expect("Bad histfile format: column A");
             let orig = tokens.next().expect("Bad histfile format: column B");
             let grave = tokens.next().expect("Bad histfile format: column C");
@@ -199,7 +197,7 @@ fn bury<S, D>(source: S, dest: D) -> io::Result<()>
                     return Err(e);
                 }
             } else {
-                try!(copy_file(path, dest.join(orphan).as_path()));
+                try!(copy_file(path, dest.join(orphan)));
             }
         }
         try!(fs::remove_dir_all(source));
@@ -312,7 +310,7 @@ fn get_last_bury<H, G>(histfile: H, graveyard: G) -> io::Result<String>
             let mut stack: Vec<&str> = Vec::new();
 
             for line in lines.iter().rev() {
-                let mut tokens = StrExt::split(line.as_str(), "\t");
+                let mut tokens = line.split("\t");
                 let user: &str = tokens.next().expect("Bad format: column A");
                 let orig: &str = tokens.next().expect("Bad format: column B");
                 let grave: &str = tokens.next().expect("Bad format: column C");
