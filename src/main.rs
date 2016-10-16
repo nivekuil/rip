@@ -322,8 +322,11 @@ fn get_last_bury(path: &Path, graveyard: &Path) -> io::Result<String> {
                         if p == grave { continue }
                     }
                     // If the top of the resurrect stack does not match the
-                    // buried item, then assume it's still in the graveyard
-                    return Ok(line.clone())
+                    // buried item, then this might be the file to bring back.
+                    // Check that the file is still in the graveyard.
+                    if Path::new(grave).exists() {
+                        return Ok(line.clone())
+                    }
                 }
             }
             return Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
