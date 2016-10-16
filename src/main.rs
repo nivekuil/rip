@@ -102,7 +102,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     if matches.is_present("seance") {
         // Can't join absolute paths, so we need to strip the leading "/"
         let path = graveyard.join(cwd.strip_prefix("/").unwrap());
-        for entry in walk_into_dir(path) {
+        for entry in WalkDir::new(path).min_depth(1) {
             println!("{}", entry.unwrap().path().display());
         }
         return;
@@ -175,29 +175,27 @@ fn bury<S, D>(source: S, dest: D) -> io::Result<()>
         return Ok(());
     }
 
+    // If that didn't work, then copy and rm.
     let parent = dest.parent().expect("Trying to delete root?");
     try!(fs::DirBuilder::new().mode(0o777).recursive(true).create(parent));
-    // If that didn't work, then copy and rm.
     if try!(fs::symlink_metadata(source)).is_dir() {
         // Walk the source, creating directories and copying files as needed
-        for entry in WalkDir::new(source).into_iter() {
-            let entry = try!(entry);
-            let path: &Path = entry.path();
+        for entry in WalkDir::new(source).into_iter().filter_map(|e| e.ok()) {
             // Path without the top-level directory
-            let orphan: &Path = path.strip_prefix(source).unwrap();
-            if path.is_dir() {
-                let mode = try!(fs::metadata(path)).permissions().mode();
+            let orphan: &Path = entry.path().strip_prefix(source).unwrap();
+            if entry.file_type().is_dir() {
+                let mode = try!(entry.metadata()).permissions().mode();
                 if let Err(e) = fs::DirBuilder::new()
                     .mode(mode)
                     .create(dest.join(orphan)) {
                     println!("Failed to create {} in {}",
-                             path.display(),
+                             entry.path().display(),
                              dest.join(orphan).display());
                     try!(fs::remove_dir_all(dest));
                     return Err(e);
                 }
             } else {
-                try!(copy_file(path, dest.join(orphan)));
+                try!(copy_file(entry.path(), dest.join(orphan)));
             }
         }
         try!(fs::remove_dir_all(source));
@@ -278,11 +276,6 @@ fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
 //         return prompt_yes("Permanently delete this file instead?")
 //     }
 // }
-
-/// return a WalkDir iterator that excludes the top-level directory.
-fn walk_into_dir<P: AsRef<Path>>(path: P) -> std::iter::Skip<walkdir::Iter> {
-    WalkDir::new(path).into_iter().skip(1)
-}
 
 /// Prompt for user input, returning True if the first character is 'y' or 'Y'
 fn prompt_yes(prompt: &str) -> bool {
