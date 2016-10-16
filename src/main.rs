@@ -26,7 +26,7 @@ static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static HISTFILE: &'static str = ".rip_history";
 
 fn main() {
-    let matches = App::with_defaults("rip")
+    let matches = App::new("rip")
         .version(crate_version!())
         .author(crate_authors!())
         .about("Rm ImProved
@@ -49,7 +49,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .short("s")
              .long("seance"))
         .arg(Arg::with_name("resurrect")
-             .help("Undo the last removal")
+             .help("Undo the last removal by the current user")
              .short("r")
              .long("resurrect"))
         .get_matches();
@@ -78,7 +78,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         let histfile: &Path = &graveyard.join(HISTFILE);
         if let Ok(s) = get_last_bury(histfile, graveyard) {
             let mut tokens = StrExt::split(s.as_str(), "\t");
-            let _ = tokens.next().expect("Bad histfile format: column A");
+            tokens.next().expect("Bad histfile format: column A");
             let orig = tokens.next().expect("Bad histfile format: column B");
             let grave = tokens.next().expect("Bad histfile format: column C");
             let source = Path::new(grave);
@@ -131,10 +131,15 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                          path.display());
                 return;
             }
-            // Can't join absolute paths, so we need to strip the leading "/"
             let dest: PathBuf = {
-                let grave = graveyard.join(path.strip_prefix("/").unwrap());
-                if symlink_exists(&grave) { rename_grave(grave) } else { grave }
+                // Can't join absolute paths, so strip the leading "/"
+                let dest = graveyard.join(path.strip_prefix("/").unwrap());
+                // Resolve a name conflict if necessary
+                if symlink_exists(&dest) {
+                    rename_grave(dest)
+                } else {
+                    dest
+                }
             };
             if let Err(e) = bury(&path, &dest) {
                 println!("ERROR: {}: {}", e, target);
@@ -323,7 +328,7 @@ fn get_last_bury(histfile: &Path, graveyard: &Path) -> io::Result<String> {
                     // If the top of the resurrect stack does not match the
                     // buried item, then this might be the file to bring back.
                     // Check that the file is still in the graveyard.
-                    if Path::new(grave).symlink_metadata().is_ok() {
+                    if symlink_exists(grave) {
                         return Ok(line.clone())
                     }
                 }
