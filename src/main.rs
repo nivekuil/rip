@@ -81,7 +81,11 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             let orig = tokens.next().expect("Bad histfile format: column B");
             let grave = tokens.next().expect("Bad histfile format: column C");
             let source = Path::new(grave);
-            let dest = Path::new(orig);
+            let dest: PathBuf = {
+                let orig = PathBuf::from(orig);
+                if orig.exists() { rename_grave(orig) } else { orig }
+            };
+            let dest = dest.as_path();
             if let Err(e) = bury(source, dest) {
                 println!("ERROR: {}: {}", e, source.display());
                 println!("Maybe the file was removed from the graveyard.");
