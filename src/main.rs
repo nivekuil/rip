@@ -68,6 +68,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
+
+    // Disable umask so rip can create a globally writable graveyard
+    unsafe {
+        libc::umask(0);
+    }
+
     if matches.is_present("resurrect") {
         let histfile: &Path = &graveyard.join(HISTFILE);
         if let Ok(s) = get_last_bury(histfile, graveyard) {
@@ -110,11 +116,6 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         println!("You should use rm to delete files in the graveyard, \
                   or --decompose to delete everything at once.");
         return;
-    }
-
-    // Disable umask so rip can create a globally writable graveyard
-    unsafe {
-        libc::umask(0);
     }
 
     if let Some(targets) = matches.values_of("TARGET") {
