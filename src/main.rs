@@ -84,7 +84,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             let source = Path::new(grave);
             let dest: PathBuf = {
                 let orig = PathBuf::from(orig);
-                if orig.exists() { rename_grave(orig) } else { orig }
+                if symlink_exists(&orig) { rename_grave(orig) } else { orig }
             };
             let dest = dest.as_path();
             if let Err(e) = bury(source, dest) {
@@ -134,7 +134,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             // Can't join absolute paths, so we need to strip the leading "/"
             let dest: PathBuf = {
                 let grave = graveyard.join(path.strip_prefix("/").unwrap());
-                if grave.exists() { rename_grave(grave) } else { grave }
+                if symlink_exists(&grave) { rename_grave(grave) } else { grave }
             };
             if let Err(e) = bury(&path, &dest) {
                 println!("ERROR: {}: {}", e, target);
@@ -248,7 +248,7 @@ fn rename_grave(grave: PathBuf) -> PathBuf {
     if grave.extension().is_none() {
         (1_u64..)
             .map(|i| grave.with_extension(i.to_string()))
-            .skip_while(|p| p.exists())
+            .skip_while(|p| symlink_exists(p))
             .next()
             .expect("Failed to rename duplicate file or directory")
     } else {
@@ -261,7 +261,7 @@ fn rename_grave(grave: PathBuf) -> PathBuf {
                                              .unwrap(),
                                              i))
             })
-            .skip_while(|p| p.exists())
+            .skip_while(|p| symlink_exists(p))
             .next()
             .expect("Failed to rename duplicate file or directory")
     }
@@ -323,7 +323,7 @@ fn get_last_bury(histfile: &Path, graveyard: &Path) -> io::Result<String> {
                     // If the top of the resurrect stack does not match the
                     // buried item, then this might be the file to bring back.
                     // Check that the file is still in the graveyard.
-                    if Path::new(grave).exists() {
+                    if Path::new(grave).symlink_metadata().is_ok() {
                         return Ok(line.clone())
                     }
                 }
@@ -332,6 +332,10 @@ fn get_last_bury(histfile: &Path, graveyard: &Path) -> io::Result<String> {
         },
         Err(e) => Err(e)
     }
+}
+
+fn symlink_exists<P: AsRef<Path>>(path: P) -> bool {
+    fs::symlink_metadata(path).is_ok()
 }
 
 fn get_user() -> String {
