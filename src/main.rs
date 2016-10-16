@@ -69,36 +69,31 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
+    let histfile: &Path = &graveyard.join(HISTFILE);
     // Disable umask so rip can create a globally writable graveyard
     unsafe {
         libc::umask(0);
     }
 
     if matches.is_present("resurrect") {
-        let histfile: &Path = &graveyard.join(HISTFILE);
         if let Ok(s) = get_last_bury(histfile, graveyard) {
             let mut tokens = StrExt::split(s.as_str(), "\t");
             tokens.next().expect("Bad histfile format: column A");
             let orig = tokens.next().expect("Bad histfile format: column B");
             let grave = tokens.next().expect("Bad histfile format: column C");
-            let source = Path::new(grave);
-            let dest: PathBuf = {
-                let orig = PathBuf::from(orig);
-                if symlink_exists(&orig) { rename_grave(orig) } else { orig }
+            let dest: &Path = &{
+                if symlink_exists(orig) {
+                    rename_grave(orig)
+                } else {
+                    PathBuf::from(orig)
+                }
             };
-            let dest = dest.as_path();
-            if let Err(e) = bury(source, dest) {
-                println!("ERROR: {}: {}", e, source.display());
-                println!("Maybe the file was removed from the graveyard.");
-                // if prompt_yes("Remove it from the history?") {
-                //     delete_last_line(histfile).unwrap();
-                // }
-            } else if let Err(e) = write_log(source, dest, graveyard) {
-                println!("Error adding {} to histfile: {}",
-                         source.display(), e);
+            if let Err(e) = bury(grave, dest) {
+                println!("ERROR: {}: {}", e, grave);
+            } else if let Err(e) = write_log(grave, dest, graveyard) {
+                println!("Error adding {} to histfile: {}", grave, e);
             } else {
-                println!("Returned {} to {}",
-                         source.display(), dest.display());
+                println!("Returned {} to {}", grave, dest.display());
             }
         }
         return;
@@ -124,14 +119,14 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     if let Some(targets) = matches.values_of("TARGET") {
         for target in targets {
-            let path: PathBuf = cwd.join(Path::new(target));
+            let path: &Path = &cwd.join(Path::new(target));
             // Check if path exists
             if path.symlink_metadata().is_err() {
                 println!("Cannot remove {}: no such file or directory",
                          path.display());
                 return;
             }
-            let dest: PathBuf = {
+            let dest: &Path = &{
                 // Can't join absolute paths, so strip the leading "/"
                 let dest = graveyard.join(path.strip_prefix("/").unwrap());
                 // Resolve a name conflict if necessary
@@ -141,9 +136,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                     dest
                 }
             };
-            if let Err(e) = bury(&path, &dest) {
+            if let Err(e) = bury(path, dest) {
                 println!("ERROR: {}: {}", e, target);
-            } else if let Err(e) = write_log(&path, &dest, graveyard) {
+            } else if let Err(e) = write_log(path, dest, histfile) {
                 println!("Error adding {} to histfile: {}", target, e);
             }
         }
@@ -153,8 +148,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 }
 
 /// Write deletion history to HISTFILE
-fn write_log(source: &Path, dest: &Path, graveyard: &Path) -> io::Result<()> {
-    let histfile = graveyard.join(HISTFILE);
+fn write_log<S, D, H>(source: S, dest: D, histfile: H) -> io::Result<()>
+    where S: AsRef<Path>, D: AsRef<Path>, H: AsRef<Path> {
+    let (source, dest) = (source.as_ref(), dest.as_ref());
     {
         let mut f = try!(fs::OpenOptions::new()
                          .mode(0o666)
@@ -172,7 +168,9 @@ fn write_log(source: &Path, dest: &Path, graveyard: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn bury(source: &Path, dest: &Path) -> io::Result<()> {
+fn bury<S, D>(source: S, dest: D) -> io::Result<()>
+    where S: AsRef<Path>, D: AsRef<Path> {
+    let (source, dest) = (source.as_ref(), dest.as_ref());
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
     if fs::rename(source, dest).is_ok() {
@@ -213,7 +211,9 @@ fn bury(source: &Path, dest: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn copy_file(source: &Path, dest: &Path) -> io::Result<()> {
+fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
+    where S: AsRef<Path>, D: AsRef<Path> {
+    let (source, dest) = (source.as_ref(), dest.as_ref());
     let metadata = try!(fs::symlink_metadata(source));
     let filetype = metadata.file_type();
     if filetype.is_file() {
@@ -249,7 +249,8 @@ fn copy_file(source: &Path, dest: &Path) -> io::Result<()> {
 }
 
 /// Add a numbered extension to duplicate filenames to avoid overwriting files.
-fn rename_grave(grave: PathBuf) -> PathBuf {
+fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
+    let grave = grave.as_ref();
     if grave.extension().is_none() {
         (1_u64..)
             .map(|i| grave.with_extension(i.to_string()))
@@ -300,7 +301,8 @@ fn prompt_yes(prompt: &str) -> bool {
 
 /// Return the line in histfile corresponding to the last buried file still in
 /// the graveyard
-fn get_last_bury(histfile: &Path, graveyard: &Path) -> io::Result<String> {
+fn get_last_bury<H, G>(histfile: H, graveyard: G) -> io::Result<String>
+    where H: AsRef<Path>, G: AsRef<Path> {
     match fs::File::open(histfile) {
         Ok(f) => {
             let lines: Vec<String> = BufReader::new(f)
@@ -319,7 +321,7 @@ fn get_last_bury(histfile: &Path, graveyard: &Path) -> io::Result<String> {
                 if user != get_user() { continue }
                 // Check if this is a resurrect.  If it is, then add the orig
                 // file onto the stack to match with the last buried
-                if Path::new(orig).starts_with(graveyard) {
+                if Path::new(orig).starts_with(&graveyard) {
                     stack.push(orig);
                 } else {
                     if let Some(p) = stack.pop() {
