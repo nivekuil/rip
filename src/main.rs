@@ -68,7 +68,6 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
-
     // Disable umask so rip can create a globally writable graveyard
     unsafe {
         libc::umask(0);
@@ -121,14 +120,11 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     if let Some(targets) = matches.values_of("TARGET") {
         for target in targets {
             let path: PathBuf = cwd.join(Path::new(target));
-            if !path.exists() {
-                // exists() follows symlinks, so if path doesn't seem to exist
-                // fstat it to check whether the path points to a symlink
-                if let Err(_) = path.symlink_metadata() {
-                    println!("Cannot remove {}: no such file or directory",
-                             path.display());
-                    return;
-                }
+            // Check if path exists
+            if path.symlink_metadata().is_err() {
+                println!("Cannot remove {}: no such file or directory",
+                         path.display());
+                return;
             }
             // Can't join absolute paths, so we need to strip the leading "/"
             let dest: PathBuf = {
@@ -147,8 +143,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 }
 
 /// Write deletion history to HISTFILE
-fn write_log(source: &Path, dest: &Path, graveyard: &Path)
-             -> io::Result<()> {
+fn write_log(source: &Path, dest: &Path, graveyard: &Path) -> io::Result<()> {
     let histfile = graveyard.join(HISTFILE);
     {
         let mut f = try!(fs::OpenOptions::new()
@@ -170,7 +165,7 @@ fn write_log(source: &Path, dest: &Path, graveyard: &Path)
 fn bury(source: &Path, dest: &Path) -> io::Result<()> {
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
-    if let Ok(_) = fs::rename(source, dest) {
+    if fs::rename(source, dest).is_ok() {
         return Ok(());
     }
 
