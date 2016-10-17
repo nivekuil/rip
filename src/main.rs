@@ -50,6 +50,10 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .help("Undo the last removal by the current user")
              .short("r")
              .long("resurrect"))
+        .arg(Arg::with_name("inspect")
+             .help("Print some info about TARGET before prompting for action")
+             .short("i")
+             .long("inspect"))
         .get_matches();
 
     let graveyard: &Path = &PathBuf::from(
@@ -118,12 +122,31 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     if let Some(targets) = matches.values_of("TARGET") {
         for target in targets {
             let path: &Path = &cwd.join(Path::new(target));
+
             // Check if path exists
-            if path.symlink_metadata().is_err() {
+            if let Ok(metadata) = path.symlink_metadata() {
+                if matches.is_present("inspect") {
+                    if metadata.is_dir() {
+                        println!("{}: directory, {} objects", target,
+                                 WalkDir::new(target).into_iter().count());
+                    } else {
+                        println!("{}: file, {} bytes", target, metadata.len());
+                        // Read the file and print the first 6 lines
+                        let f = fs::File::open(target).unwrap();
+                        for line in BufReader::new(f).lines().take(6) {
+                            println!("> {}", line.unwrap());
+                        }
+                    }
+                    if !prompt_yes(&format!("Send {} to the graveyard?", target)) {
+                        continue;
+                    }
+                }
+            } else {
                 println!("Cannot remove {}: no such file or directory",
                          path.display());
                 return;
             }
+
             let dest: &Path = &{
                 // Can't join absolute paths, so strip the leading "/"
                 let dest = graveyard.join(path.strip_prefix("/").unwrap());
@@ -134,6 +157,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                     dest
                 }
             };
+
             if let Err(e) = bury(path, dest) {
                 println!("ERROR: {}: {}", e, target);
             } else if let Err(e) = write_log(path, dest, histfile) {
@@ -145,7 +169,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 }
 
-/// Write deletion history to HISTFILE
+/// Write deletion history to histfile
 fn write_log<S, D, H>(source: S, dest: D, histfile: H) -> io::Result<()>
     where S: AsRef<Path>, D: AsRef<Path>, H: AsRef<Path> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
