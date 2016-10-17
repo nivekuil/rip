@@ -281,8 +281,8 @@ fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
 fn prompt_yes(prompt: &str) -> bool {
     print!("{} (y/n) ", prompt);
     io::stdout().flush().unwrap();
-    let stdin = io::stdin();
-    if let Some(c) = stdin.lock().chars().next() {
+    let stdin = BufReader::new(io::stdin());
+    if let Some(c) = stdin.chars().next() {
         if let Ok(c) = c {
             return c == 'y' || c == 'Y';
         }
