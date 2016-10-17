@@ -13,7 +13,7 @@ This can be a good idea because if the graveyard is mounted on an in-memory file
 A deletion log is kept in =.rip_history=, found in the top level of the graveyard.
 
 ** Installation
-Get a binary [[https://github.com/nivekuil/rip/releases][release]] (x86_64) or build it with =cargo install rm-improved=.
+Get a binary [[https://github.com/nivekuil/rip/releases][release]] (x86_64) or build it with =cargo install rm-improved= (requires a nightly version of rustc).
 
 ** Usage
 #+BEGIN_EXAMPLE
@@ -23,6 +23,7 @@ USAGE:
 FLAGS:
     -d, --decompose    Permanently delete (unlink) the entire graveyard
     -h, --help         Prints help information
+    -i, --inspect      Print some info about TARGET before prompting for action
     -r, --resurrect    Undo the last removal by the current user
     -s, --seance       List all objects in the graveyard that were sent from the current directory
     -V, --version      Prints version information
