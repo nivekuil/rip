@@ -10,9 +10,11 @@ matrix:
     - os: linux
       rust: nightly
       env: TARGET=aarch64-unknown-linux-gnu
+      sudo: required
     - os: osx
       rust: nightly
       env: TARGET=i686-apple-darwin
+      sudo: required
 before_install:
   - export PATH="$PATH:$HOME/.cargo/bin"
 
