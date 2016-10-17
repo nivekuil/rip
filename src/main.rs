@@ -247,9 +247,8 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
         }
     } else if filetype.is_fifo() {
         let path = std::ffi::CString::new(dest.to_str().unwrap()).unwrap();
-        let mode = metadata.permissions().mode();
         unsafe {
-            libc::mkfifo(path.as_ptr(), mode);
+            libc::mkfifo(path.as_ptr(), 0o644);
         }
     } else if filetype.is_symlink() {
         let target = try!(fs::read_link(source));
