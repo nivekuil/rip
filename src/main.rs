@@ -246,10 +246,11 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
             return Err(e);
         }
     } else if filetype.is_fifo() {
-        let path = std::ffi::CString::new(dest.to_str().unwrap()).unwrap();
-        unsafe {
-            libc::mkfifo(path.as_ptr(), 0o644);
-        }
+        let mode = metadata.permissions().mode();
+        std::process::Command::new("mkfifo")
+            .arg(dest)
+            .arg("-m")
+            .arg(mode.to_string());
     } else if filetype.is_symlink() {
         let target = try!(fs::read_link(source));
         try!(std::os::unix::fs::symlink(target, dest));
