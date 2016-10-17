@@ -133,7 +133,10 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                         println!("{}: file, {} bytes", target, metadata.len());
                         // Read the file and print the first 6 lines
                         let f = fs::File::open(target).unwrap();
-                        for line in BufReader::new(f).lines().take(6) {
+                        for line in BufReader::new(f)
+                            .lines()
+                            .take(6)
+                            .filter(|line| line.is_ok()) {
                             println!("> {}", line.unwrap());
                         }
                     }
