@@ -34,7 +34,6 @@ ARGS:
     <TARGET>...    File or directory to remove
 #+END_EXAMPLE
 
-In general, a deletion followed by a =--resurrect= should be idempotent.
-
-*** Why is there no =--interactive= option?
-Asking for forgiveness is easier than asking for permission.
+*** Notes
+- In general, a deletion followed by a =--resurrect= should be idempotent.
+- You probably shouldn't alias =rm= to =rip=.  =rm -r= is two characters longer, anyway.
