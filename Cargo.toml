@@ -1,6 +1,6 @@
 [package]
 name = "rm-improved"
-version = "0.8.1"
+version = "0.8.2"
 authors = ["mail@nivekuil.com"]
 description = "rip: a safety-focused alternative to rm."
 repository = "https://github.com/nivekuil/rip"
