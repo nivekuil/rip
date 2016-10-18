@@ -16,6 +16,7 @@ matrix:
       rust: nightly
       env: TARGET=i686-apple-darwin
       sudo: required
+
 before_install:
   - export PATH="$PATH:$HOME/.cargo/bin"
 
@@ -35,11 +36,6 @@ deploy:
   on:
     condition: $TRAVIS_RUST_VERSION = nightly
     tags: true
-
-branches:
-  only:
-    - master
-    - /^v\d+\.\d+\.\d+.*$/
 
 notifications:
   email: false
