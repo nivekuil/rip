@@ -42,10 +42,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .short("d")
              .long("decompose"))
         .arg(Arg::with_name("seance")
-             .help("List all objects in the graveyard that were sent from the \
-                    current directory")
+             .help("List all objects in graveyard that were sent from the \
+                    current directory, or specify a depth.")
              .short("s")
-             .long("seance"))
+             .long("seance")
+             .value_name("depth")
+             .min_values(0))
         .arg(Arg::with_name("resurrect")
              .help("Undo the last removal by the current user")
              .short("r")
@@ -106,7 +108,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     if matches.is_present("seance") {
         // Can't join absolute paths, so we need to strip the leading "/"
         let path = graveyard.join(cwd.strip_prefix("/").unwrap());
-        for entry in WalkDir::new(path).min_depth(1) {
+        let walkdir = if let Some(s) = matches.value_of("seance") {
+            WalkDir::new(path).min_depth(1).max_depth(s.parse().unwrap())
+        } else {
+            WalkDir::new(path).min_depth(1)
+        };
+        for entry in walkdir {
             println!("{}", entry.unwrap().path().display());
         }
         return;
