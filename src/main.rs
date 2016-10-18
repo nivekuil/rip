@@ -113,8 +113,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         } else {
             WalkDir::new(path).min_depth(1)
         };
-        for entry in walkdir {
-            println!("{}", entry.unwrap().path().display());
+        for entry in walkdir.into_iter().filter_map(|e| e.ok()) {
+            println!("{}", entry.path().display());
         }
         return;
     }
