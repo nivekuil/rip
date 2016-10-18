@@ -21,7 +21,7 @@ use std::os::unix::fs::DirBuilderExt;
 use std::os::unix::fs::PermissionsExt;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
-static HISTFILE: &'static str = ".rip_history";
+static RECORD: &'static str = ".record";
 
 fn main() {
     let matches = App::new("rip")
@@ -73,18 +73,18 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
-    let histfile: &Path = &graveyard.join(HISTFILE);
+    let record: &Path = &graveyard.join(RECORD);
     // Disable umask so rip can create a globally writable graveyard
     unsafe {
         libc::umask(0);
     }
 
     if matches.is_present("resurrect") {
-        if let Ok(s) = get_last_bury(histfile, graveyard) {
+        if let Ok(s) = get_last_bury(record, graveyard) {
             let mut tokens = s.split("\t");
-            tokens.next().expect("Bad histfile format: column A");
-            let orig = tokens.next().expect("Bad histfile format: column B");
-            let grave = tokens.next().expect("Bad histfile format: column C");
+            tokens.next().expect("Bad record format: column A");
+            let orig = tokens.next().expect("Bad record format: column B");
+            let grave = tokens.next().expect("Bad record format: column C");
             let dest: &Path = &{
                 if symlink_exists(orig) {
                     rename_grave(orig)
@@ -94,8 +94,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             };
             if let Err(e) = bury(grave, dest) {
                 println!("ERROR: {}: {}", e, grave);
-            } else if let Err(e) = write_log(grave, dest, histfile) {
-                println!("Error adding {} to histfile: {}", grave, e);
+            } else if let Err(e) = write_log(grave, dest, record) {
+                println!("Error adding {} to record: {}", grave, e);
             } else {
                 println!("Returned {} to {}", grave, dest.display());
             }
@@ -170,8 +170,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
             if let Err(e) = bury(path, dest) {
                 println!("ERROR: {}: {}", e, target);
-            } else if let Err(e) = write_log(path, dest, histfile) {
-                println!("Error adding {} to histfile: {}", target, e);
+            } else if let Err(e) = write_log(path, dest, record) {
+                println!("Error adding {} to record: {}", target, e);
             }
         }
     } else {
@@ -179,16 +179,16 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 }
 
-/// Write deletion history to histfile
-fn write_log<S, D, H>(source: S, dest: D, histfile: H) -> io::Result<()>
-    where S: AsRef<Path>, D: AsRef<Path>, H: AsRef<Path> {
+/// Write deletion history to record
+fn write_log<S, D, R>(source: S, dest: D, record: R) -> io::Result<()>
+    where S: AsRef<Path>, D: AsRef<Path>, R: AsRef<Path> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
     {
         let mut f = try!(fs::OpenOptions::new()
                          .mode(0o666)
                          .create(true)
                          .append(true)
-                         .open(histfile));
+                         .open(record));
         try!(f.write_all(
             format!("{}\t{}\t{}\n",
                     get_user(),
@@ -324,11 +324,11 @@ fn prompt_yes(prompt: &str) -> bool {
     false
 }
 
-/// Return the line in histfile corresponding to the last buried file still in
+/// Return the line in record corresponding to the last buried file still in
 /// the graveyard
-fn get_last_bury<H, G>(histfile: H, graveyard: G) -> io::Result<String>
-    where H: AsRef<Path>, G: AsRef<Path> {
-    match fs::File::open(histfile) {
+fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
+    where R: AsRef<Path>, G: AsRef<Path> {
+    match fs::File::open(record) {
         Ok(f) => {
             let lines: Vec<String> = BufReader::new(f)
                 .lines()

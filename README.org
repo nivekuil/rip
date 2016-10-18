@@ -11,7 +11,7 @@ If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), y
 2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=
 This can be a good idea because if the graveyard is mounted on an in-memory filesystem, (as /tmp is in Arch Linux), deleting large files can quickly fill up your RAM.  It's also much slower to move files across filesystems, although the delay should be minimal with an SSD.
 
-A deletion log is kept in =.rip_history=, found in the top level of the graveyard.
+A deletion log is kept in the =.record=, found in the top level of the graveyard.
 
 ** Installation
 Get a binary [[https://github.com/nivekuil/rip/releases][release]] (x86_64) or build it with =cargo install rm-improved= (requires a nightly version of rustc).
