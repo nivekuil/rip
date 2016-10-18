@@ -14,7 +14,7 @@ matrix:
       sudo: required
     - os: osx
       rust: nightly
-      env: TARGET=i686-apple-darwin
+      env: TARGET=x86_64-apple-darwin
       sudo: required
 
 before_install:
