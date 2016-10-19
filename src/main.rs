@@ -22,6 +22,7 @@ use std::os::unix::fs::PermissionsExt;
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static RECORD: &'static str = ".record";
+const LINES_TO_INSPECT: usize = 6;
 
 fn main() {
     let matches = App::new("rip")
@@ -142,7 +143,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                         let f = fs::File::open(target).unwrap();
                         for line in BufReader::new(f)
                             .lines()
-                            .take(6)
+                            .take(LINES_TO_INSPECT)
                             .filter(|line| line.is_ok()) {
                             println!("> {}", line.unwrap());
                         }
