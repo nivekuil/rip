@@ -184,17 +184,16 @@ fn write_log<S, D, R>(source: S, dest: D, record: R) -> io::Result<()>
     where S: AsRef<Path>, D: AsRef<Path>, R: AsRef<Path> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
     {
-        let mut f = try!(fs::OpenOptions::new()
+        let mut f = fs::OpenOptions::new()
                          .mode(0o666)
                          .create(true)
                          .append(true)
-                         .open(record));
-        try!(f.write_all(
-            format!("{}\t{}\t{}\n",
-                    get_user(),
-                    source.to_str().unwrap(),
-                    dest.to_str().unwrap(),
-            ).as_bytes()));
+                         .open(record)?;
+        f.write_all(format!("{}\t{}\t{}\n",
+                            get_user(),
+                            source.to_str().unwrap(),
+                            dest.to_str().unwrap())
+                    .as_bytes())?;
     }
 
     Ok(())
@@ -211,31 +210,31 @@ fn bury<S, D>(source: S, dest: D) -> io::Result<()>
 
     // If that didn't work, then copy and rm.
     let parent = dest.parent().expect("Trying to delete root?");
-    try!(fs::DirBuilder::new().mode(0o777).recursive(true).create(parent));
-    if try!(fs::symlink_metadata(source)).is_dir() {
+    fs::DirBuilder::new().mode(0o777).recursive(true).create(parent)?;
+    if fs::symlink_metadata(source)?.is_dir() {
         // Walk the source, creating directories and copying files as needed
         for entry in WalkDir::new(source).into_iter().filter_map(|e| e.ok()) {
             // Path without the top-level directory
             let orphan: &Path = entry.path().strip_prefix(source).unwrap();
             if entry.file_type().is_dir() {
-                let mode = try!(entry.metadata()).permissions().mode();
+                let mode = entry.metadata()?.permissions().mode();
                 if let Err(e) = fs::DirBuilder::new()
                     .mode(mode)
                     .create(dest.join(orphan)) {
                     println!("Failed to create {} in {}",
                              entry.path().display(),
                              dest.join(orphan).display());
-                    try!(fs::remove_dir_all(dest));
+                    fs::remove_dir_all(dest)?;
                     return Err(e);
                 }
             } else {
-                try!(copy_file(entry.path(), dest.join(orphan)));
+                copy_file(entry.path(), dest.join(orphan))?;
             }
         }
-        try!(fs::remove_dir_all(source));
+        fs::remove_dir_all(source)?;
     } else {
-        try!(copy_file(source, dest));
-        try!(fs::remove_file(source));
+        copy_file(source, dest)?;
+        fs::remove_file(source)?;
     }
 
     Ok(())
@@ -244,7 +243,7 @@ fn bury<S, D>(source: S, dest: D) -> io::Result<()>
 fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
     where S: AsRef<Path>, D: AsRef<Path> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
-    let metadata = try!(fs::symlink_metadata(source));
+    let metadata = fs::symlink_metadata(source)?;
     let filetype = metadata.file_type();
     if filetype.is_file() {
         if let Err(e) = fs::copy(source, dest) {
@@ -259,8 +258,8 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
             .arg("-m")
             .arg(mode.to_string());
     } else if filetype.is_symlink() {
-        let target = try!(fs::read_link(source));
-        try!(std::os::unix::fs::symlink(target, dest));
+        let target = fs::read_link(source)?;
+        std::os::unix::fs::symlink(target, dest)?;
     } else {
         // Special file: Try copying it as normal, but this probably won't work
         if let Err(e) = fs::copy(source, dest) {
@@ -269,9 +268,9 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
                 return Err(e);
             }
             // Create a dummy file to act as a marker in the graveyard
-            let mut marker = try!(fs::File::create(dest));
-            try!(marker.write_all(b"This is a marker for a file that was per\
-                                    manently deleted.  Requiescat in pace."));
+            let mut marker = fs::File::create(dest)?;
+            marker.write_all(b"This is a marker for a file that was \
+                               permanently deleted.  Requiescat in pace.")?;
         }
     }
 
