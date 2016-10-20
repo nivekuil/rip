@@ -50,9 +50,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .value_name("depth")
              .min_values(0))
         .arg(Arg::with_name("resurrect")
-             .help("Undo the last removal by the current user")
+             .help("Undo the last removal by the current user, or specify \
+                    some file(s) in the graveyard.")
              .short("r")
-             .long("resurrect"))
+             .long("resurrect")
+             .value_name("target")
+             .min_values(0))
         .arg(Arg::with_name("inspect")
              .help("Print some info about TARGET before prompting for action")
              .short("i")
@@ -81,7 +84,17 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 
     if matches.is_present("resurrect") {
-        if let Ok(s) = get_last_bury(record, graveyard) {
+        if let Some(s) = matches.values_of("resurrect") {
+            for grave in s {
+                let dest = grave.trim_left_matches(
+                    graveyard.to_str().unwrap());
+                if let Err(e) = bury(grave, dest) {
+                    println!("ERROR: {}: {}", e, grave);
+                } else {
+                    println!("Returned {} to {}", grave, dest);
+                }
+            }
+        } else if let Ok(s) = get_last_bury(record, graveyard) {
             let mut tokens = s.split("\t");
             tokens.next().expect("Bad record format: column A");
             let orig = tokens.next().expect("Bad record format: column B");
