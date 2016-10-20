@@ -73,7 +73,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     if matches.is_present("decompose") {
         if prompt_yes("Really unlink the entire graveyard?"){
-            fs::remove_dir_all(graveyard).is_ok();
+            if let Err(e) = fs::remove_dir_all(graveyard) {
+                println!("ERROR: {}", e);
+            }
         }
         return;
     }
