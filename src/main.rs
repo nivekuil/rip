@@ -129,18 +129,18 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
     if let Some(targets) = matches.values_of("TARGET") {
         for target in targets {
-            let path: &Path = &cwd.join(Path::new(target));
+            let source: &Path = &cwd.join(Path::new(target));
 
-            // Check if path exists
-            if let Ok(metadata) = path.symlink_metadata() {
+            // Check if source exists
+            if let Ok(metadata) = source.symlink_metadata() {
                 if matches.is_present("inspect") {
                     if metadata.is_dir() {
                         println!("{}: directory, {} objects", target,
-                                 WalkDir::new(target).into_iter().count());
+                                 WalkDir::new(source).into_iter().count());
                     } else {
                         println!("{}: file, {} bytes", target, metadata.len());
                         // Read the file and print the first 6 lines
-                        let f = fs::File::open(target).unwrap();
+                        let f = fs::File::open(source).unwrap();
                         for line in BufReader::new(f)
                             .lines()
                             .take(LINES_TO_INSPECT)
@@ -148,19 +148,20 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                             println!("> {}", line.unwrap());
                         }
                     }
-                    if !prompt_yes(&format!("Send {} to the graveyard?", target)) {
+                    if !prompt_yes(&format!("Send {} to the graveyard?",
+                                            target)) {
                         continue;
                     }
                 }
             } else {
                 println!("Cannot remove {}: no such file or directory",
-                         path.display());
+                         target);
                 return;
             }
 
             let dest: &Path = &{
                 // Can't join absolute paths, so strip the leading "/"
-                let dest = graveyard.join(path.strip_prefix("/").unwrap());
+                let dest = graveyard.join(source.strip_prefix("/").unwrap());
                 // Resolve a name conflict if necessary
                 if symlink_exists(&dest) {
                     rename_grave(dest)
@@ -169,9 +170,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                 }
             };
 
-            if let Err(e) = bury(path, dest) {
+            if let Err(e) = bury(source, dest) {
                 println!("ERROR: {}: {}", e, target);
-            } else if let Err(e) = write_log(path, dest, record) {
+            } else if let Err(e) = write_log(source, dest, record) {
                 println!("Error adding {} to record: {}", target, e);
             }
         }
@@ -246,6 +247,7 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
     let (source, dest) = (source.as_ref(), dest.as_ref());
     let metadata = fs::symlink_metadata(source)?;
     let filetype = metadata.file_type();
+
     if filetype.is_file() {
         if let Err(e) = fs::copy(source, dest) {
             println!("Failed to copy {} to {}",
@@ -355,12 +357,13 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
                     // If the top of the resurrect stack does not match the
                     // buried item, then this might be the file to bring back.
                     // Check that the file is still in the graveyard.
+                    // If it is, return the corresponding line.
                     if symlink_exists(grave) {
                         return Ok(line.clone())
                     }
                 }
             }
-            return Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
+            Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
         },
         Err(e) => Err(e)
     }
