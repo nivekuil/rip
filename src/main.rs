@@ -19,6 +19,7 @@ use std::os::unix::fs::FileTypeExt;
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::fs::DirBuilderExt;
 use std::os::unix::fs::PermissionsExt;
+include!("util.rs");
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static RECORD: &'static str = ".record";
@@ -293,31 +294,6 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
     Ok(())
 }
 
-/// Add a numbered extension to duplicate filenames to avoid overwriting files.
-fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
-    let grave = grave.as_ref();
-    if grave.extension().is_none() {
-        (1_u64..)
-            .map(|i| grave.with_extension(i.to_string()))
-            .skip_while(|p| symlink_exists(p))
-            .next()
-            .expect("Failed to rename duplicate file or directory")
-    } else {
-        (1_u64..)
-            .map(|i| {
-                grave.with_extension(format!("{}.{}",
-                                             grave.extension()
-                                             .unwrap()
-                                             .to_str()
-                                             .unwrap(),
-                                             i))
-            })
-            .skip_while(|p| symlink_exists(p))
-            .next()
-            .expect("Failed to rename duplicate file or directory")
-    }
-}
-
 // fn warn_big_file(filedata: fs::Metadata) -> bool {
 //     let threshold = 500000000;
 //     if filedata.size() > threshold {
@@ -325,19 +301,6 @@ fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
 //         return prompt_yes("Permanently delete this file instead?")
 //     }
 // }
-
-/// Prompt for user input, returning True if the first character is 'y' or 'Y'
-fn prompt_yes(prompt: &str) -> bool {
-    print!("{} (y/n) ", prompt);
-    io::stdout().flush().unwrap();
-    let stdin = BufReader::new(io::stdin());
-    if let Some(c) = stdin.chars().next() {
-        if let Ok(c) = c {
-            return c == 'y' || c == 'Y';
-        }
-    }
-    false
-}
 
 /// Return the line in record corresponding to the last buried file still in
 /// the graveyard
@@ -371,6 +334,9 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
                     // If it is, return the corresponding line.
                     if symlink_exists(grave) {
                         return Ok(String::from(line))
+                    } else {
+                        // File was moved, remove the line from record
+
                     }
                 }
             }
@@ -378,12 +344,4 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
         },
         Err(e) => Err(e)
     }
-}
-
-fn symlink_exists<P: AsRef<Path>>(path: P) -> bool {
-    fs::symlink_metadata(path).is_ok()
-}
-
-fn get_user() -> String {
-    env::var("USER").unwrap_or(String::from("unknown"))
 }
