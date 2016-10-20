@@ -331,14 +331,12 @@ fn prompt_yes(prompt: &str) -> bool {
 fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
     where R: AsRef<Path>, G: AsRef<Path> {
     match fs::File::open(record) {
-        Ok(f) => {
-            let lines: Vec<String> = BufReader::new(f)
-                .lines()
-                .map(|line| line.unwrap())
-                .collect();
+        Ok(mut f) => {
+            let mut contents = String::new();
+            f.read_to_string(&mut contents)?;
             let mut stack: Vec<&str> = Vec::new();
 
-            for line in lines.iter().rev() {
+            for line in contents.lines().rev() {
                 let mut tokens = line.split("\t");
                 let user: &str = tokens.next().expect("Bad format: column A");
                 let orig: &str = tokens.next().expect("Bad format: column B");
@@ -359,7 +357,7 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
                     // Check that the file is still in the graveyard.
                     // If it is, return the corresponding line.
                     if symlink_exists(grave) {
-                        return Ok(line.clone())
+                        return Ok(String::from(line))
                     }
                 }
             }
