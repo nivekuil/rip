@@ -199,18 +199,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 fn write_log<S, D, R>(source: S, dest: D, record: R) -> io::Result<()>
     where S: AsRef<Path>, D: AsRef<Path>, R: AsRef<Path> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
-    {
-        let mut f = fs::OpenOptions::new()
-                         .mode(0o666)
-                         .create(true)
-                         .append(true)
-                         .open(record)?;
-        f.write_all(format!("{}\t{}\t{}\n",
-                            get_user(),
-                            source.to_str().unwrap(),
-                            dest.to_str().unwrap())
-                    .as_bytes())?;
-    }
+    let mut f = fs::OpenOptions::new()
+        .mode(0o666)
+        .create(true)
+        .append(true)
+        .open(record)?;
+    writeln!(f, "{}\t{}\t{}", get_user(), source.display(), dest.display())?;
 
     Ok(())
 }
