@@ -92,35 +92,67 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         libc::umask(0);
     }
 
-    if let Some(s) = matches.values_of("resurrect") {
-        // Check if any arguments were passed to --resurrect
-        if s.clone().next().is_some() {
-            for grave in s {
-                let dest = grave.trim_left_matches(
-                    graveyard.to_str().unwrap());
-                if let Err(e) = bury(grave, dest) {
-                    println!("ERROR: {}: {}", e, grave);
-                } else {
-                    println!("Returned {} to {}", grave, dest);
-                }
-            }
-        } else if let Ok(s) = get_last_bury(record, graveyard) {
-            let (_, orig, grave) = parse_record_line(s.as_str());
-            let dest: &Path = &{
-                if symlink_exists(orig) {
-                    rename_grave(orig)
-                } else {
-                    PathBuf::from(orig)
-                }
-            };
+    if let Some(mut s) = matches.values_of("resurrect") {
+        // Vector to hold the grave path of resurrected items
+        let mut skip: Vec<String> = Vec::new();
+        // Handle any arguments were passed to --resurrect
+        while let Some(grave) = s.next() {
+            let dest = grave.trim_left_matches(
+                graveyard.to_str().unwrap());
             if let Err(e) = bury(grave, dest) {
                 println!("ERROR: {}: {}", e, grave);
-            } else if let Err(e) = write_log(grave, dest, record) {
-                println!("Error adding {} to record: {}", grave, e);
             } else {
-                println!("Returned {} to {}", grave, dest.display());
+                println!("Returned {} to {}", grave, dest);
+            }
+            skip.push(grave.to_string());
+        }
+
+        // Otherwise, return the last deleted file
+        if skip.len() == 0 {
+            if let Ok(s) = get_last_bury(record, graveyard) {
+                let (orig, grave) = {
+                    let record_line = record_line(s.as_str());
+                    (record_line.orig, record_line.dest)
+                };
+                let dest: &Path = &{
+                    if symlink_exists(orig) {
+                        rename_grave(orig)
+                    } else {
+                        PathBuf::from(orig)
+                    }
+                };
+                if let Err(e) = bury(grave, dest) {
+                    println!("ERROR: {}: {}", e, grave);
+                }  else {
+                    println!("Returned {} to {}", grave, dest.display());
+                }
+                skip.push(grave.to_string());
             }
         }
+
+        // Get the lines to write back
+        let lines: Vec<String> = {
+            if let Ok(f) = fs::File::open(record) {
+                BufReader::new(f)
+                    .lines()
+                    .filter_map(|l| l.ok())
+                    .filter(|l| skip.clone().into_iter()
+                            .any(|y| y != record_line(l.as_str()).dest))
+                    .collect()
+            } else {
+                println!("Failed to read record.");
+                return
+            }
+        };
+        if let Ok(mut f) = fs::File::create(record) {
+            for line in lines {
+                // println!("WRITING {}", line);
+                writeln!(f, "{}", line).unwrap();
+            }
+        } else {
+            println!("Failed to write record.");
+        }
+
         return;
     }
 
@@ -158,8 +190,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                             .lines()
                             .take(LINES_TO_INSPECT)
                             .filter_map(|line| line.ok()) {
-                            println!("> {}", line);
-                        }
+                                println!("> {}", line);
+                            }
                     }
                     if !prompt_yes(&format!("Send {} to the graveyard?",
                                             target)) {
