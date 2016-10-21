@@ -93,8 +93,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 
     if let Some(mut s) = matches.values_of("resurrect") {
-        // Vector to hold the grave path of resurrected items
-        let mut skip: Vec<String> = Vec::new();
+        // Vector to hold the grave path of resurrected items that we want
+        // to remove from the record following the resurrect
+        let mut graves_to_exhume: Vec<String> = Vec::new();
         // Handle any arguments were passed to --resurrect
         while let Some(grave) = s.next() {
             let dest = grave.trim_left_matches(
@@ -104,12 +105,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             } else {
                 println!("Returned {} to {}", grave, dest);
             }
-            skip.push(grave.to_string());
+            graves_to_exhume.push(grave.to_string());
         }
 
         // Otherwise, return the last deleted file
-        if skip.len() == 0 {
-            if let Ok(s) = get_last_bury(record, graveyard) {
+        if graves_to_exhume.len() == 0 {
+            if let Ok(s) = get_last_bury(record) {
                 let (orig, grave) = {
                     let record_line = record_line(s.as_str());
                     (record_line.orig, record_line.dest)
@@ -126,32 +127,13 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                 }  else {
                     println!("Returned {} to {}", grave, dest.display());
                 }
-                skip.push(grave.to_string());
+                graves_to_exhume.push(grave.to_string());
             }
         }
 
-        // Get the lines to write back
-        let lines: Vec<String> = {
-            if let Ok(f) = fs::File::open(record) {
-                BufReader::new(f)
-                    .lines()
-                    .filter_map(|l| l.ok())
-                    .filter(|l| skip.clone().into_iter()
-                            .any(|y| y != record_line(l.as_str()).dest))
-                    .collect()
-            } else {
-                println!("Failed to read record.");
-                return
-            }
+        if let Err(e) = delete_line_from_record(record, graves_to_exhume) {
+            println!("Failed to delete resurrects from grave record: {}", e)
         };
-        if let Ok(mut f) = fs::File::create(record) {
-            for line in lines {
-                // println!("WRITING {}", line);
-                writeln!(f, "{}", line).unwrap();
-            }
-        } else {
-            println!("Failed to write record.");
-        }
 
         return;
     }
@@ -343,39 +325,28 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
 
 /// Return the line in record corresponding to the last buried file still in
 /// the graveyard
-fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
-    where R: AsRef<Path>, G: AsRef<Path> {
+fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
+    let record = record.as_ref();
     match fs::File::open(record) {
         Ok(mut f) => {
             let mut contents = String::new();
             f.read_to_string(&mut contents)?;
-            let mut stack: Vec<&str> = Vec::new();
 
             for line in contents.lines().rev() {
-                let (user, orig, grave) = {
+                let (user, grave) = {
                     let record_line = record_line(line);
-                    (record_line.user, record_line.orig, record_line.dest)
+                    (record_line.user, record_line.dest)
                 };
                 // Only resurrect files buried by the same user
                 if user != get_user() { continue }
-                // Check if this is a resurrect.  If it is, then add the orig
-                // file onto the stack to match with the last buried
-                if Path::new(orig).starts_with(&graveyard) {
-                    stack.push(orig);
-                } else {
-                    if let Some(p) = stack.pop() {
-                        if p == grave { continue }
-                    }
-                    // If the top of the resurrect stack does not match the
-                    // buried item, then this might be the file to bring back.
-                    // Check that the file is still in the graveyard.
-                    // If it is, return the corresponding line.
-                    if symlink_exists(grave) {
-                        return Ok(String::from(line))
-                    } else {
-                        // File was moved, remove the line from record
 
-                    }
+                // Check that the file is still in the graveyard.
+                // If it is, return the corresponding line.
+                if symlink_exists(grave) {
+                    return Ok(String::from(line))
+                } else {
+                    // File was moved, remove the line from record
+                    delete_line_from_record(record, vec![String::from(line)])?;
                 }
             }
             Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
@@ -384,10 +355,35 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
     }
 }
 
+/// Parse a line in the record into a RecordItem
 fn record_line(line: &str) -> RecordItem {
     let mut tokens = line.split("\t");
     let user: &str = tokens.next().expect("Bad format: column A");
     let orig: &str = tokens.next().expect("Bad format: column B");
     let dest: &str = tokens.next().expect("Bad format: column C");
     RecordItem { user: user, orig: orig, dest: dest }
+}
+
+fn delete_line_from_record<R>(record: R, graves_to_exhume: Vec<String>)
+                              -> io::Result<()> where R: AsRef<Path> {
+    let record = record.as_ref();
+    // Get the lines to write back to record
+    let lines: Vec<String> = {
+        match fs::File::open(record) {
+            Ok(f) => BufReader::new(f)
+                .lines()
+                .filter_map(|l| l.ok())
+                .filter(|l| graves_to_exhume.clone().into_iter()
+                        .any(|y| y != record_line(l.as_str()).dest))
+                .collect(),
+            Err(e) => return Err(e)
+        }
+    };
+    match fs::File::create(record) {
+        Ok(mut f) => for line in lines {
+            writeln!(f, "{}", line).unwrap();
+        },
+        Err(e) => return Err(e)
+    }
+    Ok(())
 }
