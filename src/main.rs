@@ -134,13 +134,6 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         return;
     }
 
-    if cwd.starts_with(graveyard) {
-        // Not addressed: if you try to rip graveyard, it'll break very loudly
-        println!("You should use rm to delete files in the graveyard, \
-                  or --decompose to delete everything at once.");
-        return;
-    }
-
     if let Some(targets) = matches.values_of("TARGET") {
         for target in targets {
             let source: &Path = &cwd.join(Path::new(target));
@@ -171,6 +164,20 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                 println!("Cannot remove {}: no such file or directory",
                          target);
                 return;
+            }
+
+            // If rip is called on a file already in the graveyard, prompt
+            // to permanently delete it instead.
+            if source.starts_with(graveyard) {
+                println!("{} is already in the graveyard.", source.display());
+                if prompt_yes("Permanently unlink it?") {
+                    if let Err(_) = fs::remove_dir_all(source) {
+                        if let Err(e) = fs::remove_file(source) {
+                            println!("Couldn't unlink {}:", e);
+                        }
+                    }
+                    continue;
+                }
             }
 
             let dest: &Path = &{
