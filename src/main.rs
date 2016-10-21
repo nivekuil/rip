@@ -375,8 +375,8 @@ fn delete_line_from_record<R>(record: R, graves_to_exhume: Vec<String>)
             Ok(f) => BufReader::new(f)
                 .lines()
                 .filter_map(|l| l.ok())
-                .filter(|l| graves_to_exhume.clone().into_iter()
-                        .any(|y| y != record_line(l.as_str()).dest))
+                .filter(|l| !graves_to_exhume.clone().into_iter()
+                        .any(|y| y == record_line(l.as_str()).dest))
                 .collect(),
             Err(e) => return Err(e)
         }
