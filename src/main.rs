@@ -25,6 +25,12 @@ static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static RECORD: &'static str = ".record";
 const LINES_TO_INSPECT: usize = 6;
 
+struct RecordItem<'a> {
+    user: &'a str,
+    orig: &'a str,
+    dest: &'a str,
+}
+
 fn main() {
     let matches = App::new("rip")
         .version(crate_version!())
@@ -125,7 +131,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         let path = graveyard.join(cwd.strip_prefix("/").unwrap());
         if let Ok(f) = fs::File::open(record) {
             for line in BufReader::new(f).lines().filter_map(|l| l.ok()) {
-                let (_, _, dest) = parse_record_line(line.as_str());
+                let dest = record_line(line.as_str()).dest;
                 if dest.starts_with(path.to_str().unwrap()) {
                     println!("{}", dest);
                 }
@@ -314,7 +320,10 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
             let mut stack: Vec<&str> = Vec::new();
 
             for line in contents.lines().rev() {
-                let (user, orig, grave) = parse_record_line(line);
+                let (user, orig, grave) = {
+                    let record_line = record_line(line);
+                    (record_line.user, record_line.orig, record_line.dest)
+                };
                 // Only resurrect files buried by the same user
                 if user != get_user() { continue }
                 // Check if this is a resurrect.  If it is, then add the orig
@@ -343,10 +352,10 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
     }
 }
 
-fn parse_record_line(line: &str) -> (&str, &str, &str) {
+fn record_line(line: &str) -> RecordItem {
     let mut tokens = line.split("\t");
     let user: &str = tokens.next().expect("Bad format: column A");
-    let source: &str = tokens.next().expect("Bad format: column B");
+    let orig: &str = tokens.next().expect("Bad format: column B");
     let dest: &str = tokens.next().expect("Bad format: column C");
-    (user, source, dest)
+    RecordItem { user: user, orig: orig, dest: dest }
 }
