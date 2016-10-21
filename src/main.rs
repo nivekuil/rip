@@ -86,8 +86,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         libc::umask(0);
     }
 
-    if matches.is_present("resurrect") {
-        if let Some(s) = matches.values_of("resurrect") {
+    if let Some(s) = matches.values_of("resurrect") {
+        // Check if any arguments were passed to --resurrect
+        if s.clone().next().is_some() {
             for grave in s {
                 let dest = grave.trim_left_matches(
                     graveyard.to_str().unwrap());
@@ -98,10 +99,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                 }
             }
         } else if let Ok(s) = get_last_bury(record, graveyard) {
-            let mut tokens = s.split("\t");
-            tokens.next().expect("Bad record format: column A");
-            let orig = tokens.next().expect("Bad record format: column B");
-            let grave = tokens.next().expect("Bad record format: column C");
+            let (_, orig, grave) = parse_record_line(s.as_str());
             let dest: &Path = &{
                 if symlink_exists(orig) {
                     rename_grave(orig)
@@ -125,13 +123,13 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     if matches.is_present("seance") {
         // Can't join absolute paths, so we need to strip the leading "/"
         let path = graveyard.join(cwd.strip_prefix("/").unwrap());
-        let walkdir = if let Some(s) = matches.value_of("seance") {
-            WalkDir::new(path).min_depth(1).max_depth(s.parse().unwrap())
-        } else {
-            WalkDir::new(path).min_depth(1)
-        };
-        for entry in walkdir.into_iter().filter_map(|e| e.ok()) {
-            println!("{}", entry.path().display());
+        if let Ok(f) = fs::File::open(record) {
+            for line in BufReader::new(f).lines().filter_map(|l| l.ok()) {
+                let (_, _, dest) = parse_record_line(line.as_str());
+                if dest.starts_with(path.to_str().unwrap()) {
+                    println!("{}", dest);
+                }
+            }
         }
         return;
     }
@@ -160,8 +158,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                         for line in BufReader::new(f)
                             .lines()
                             .take(LINES_TO_INSPECT)
-                            .filter(|line| line.is_ok()) {
-                            println!("> {}", line.unwrap());
+                            .filter_map(|line| line.ok()) {
+                            println!("> {}", line);
                         }
                     }
                     if !prompt_yes(&format!("Send {} to the graveyard?",
@@ -315,11 +313,7 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
             let mut stack: Vec<&str> = Vec::new();
 
             for line in contents.lines().rev() {
-                let mut tokens = line.split("\t");
-                let user: &str = tokens.next().expect("Bad format: column A");
-                let orig: &str = tokens.next().expect("Bad format: column B");
-                let grave: &str = tokens.next().expect("Bad format: column C");
-
+                let (user, orig, grave) = parse_record_line(line);
                 // Only resurrect files buried by the same user
                 if user != get_user() { continue }
                 // Check if this is a resurrect.  If it is, then add the orig
@@ -346,4 +340,12 @@ fn get_last_bury<R, G>(record: R, graveyard: G) -> io::Result<String>
         },
         Err(e) => Err(e)
     }
+}
+
+fn parse_record_line(line: &str) -> (&str, &str, &str) {
+    let mut tokens = line.split("\t");
+    let user: &str = tokens.next().expect("Bad format: column A");
+    let source: &str = tokens.next().expect("Bad format: column B");
+    let dest: &str = tokens.next().expect("Bad format: column C");
+    (user, source, dest)
 }
