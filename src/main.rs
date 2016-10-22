@@ -19,6 +19,7 @@ use std::os::unix::fs::FileTypeExt;
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::fs::DirBuilderExt;
 use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::MetadataExt;
 include!("util.rs");
 
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
@@ -173,18 +174,26 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             if let Ok(metadata) = source.symlink_metadata() {
                 if matches.is_present("inspect") {
                     if metadata.is_dir() {
-                        println!("{}: directory, {} objects", target,
-                                 WalkDir::new(source).into_iter().count());
+                        println!("{}: directory, {} bytes", target,
+                                 WalkDir::new(source)
+                                 .into_iter()
+                                 .filter_map(|x| x.ok())
+                                 .filter_map(|x| x.metadata().ok())
+                                 .map(|x| x.size())
+                                 .sum::<u64>());
                     } else {
                         println!("{}: file, {} bytes", target, metadata.len());
                         // Read the file and print the first 6 lines
-                        let f = fs::File::open(source).unwrap();
-                        let lines_to_print = BufReader::new(f)
-                            .lines()
-                            .take(LINES_TO_INSPECT)
-                            .filter_map(|line| line.ok());
-                        for line in lines_to_print {
-                            println!("> {}", line);
+                        if let Ok(f) = fs::File::open(source) {
+                            let lines_to_print = BufReader::new(f)
+                                .lines()
+                                .take(LINES_TO_INSPECT)
+                                .filter_map(|line| line.ok());
+                            for line in lines_to_print {
+                                println!("> {}", line);
+                            }
+                        } else {
+                            println!("Error reading {}", source.display());
                         }
                     }
                     if !prompt_yes(&format!("Send {} to the graveyard?", target)) {
