@@ -2,7 +2,9 @@
 [[https://crates.io/crates/rm-improved][https://img.shields.io/crates/v/rm-improved.svg]]
 [[https://travis-ci.org/nivekuil/rip][https://travis-ci.org/nivekuil/rip.svg?branch=master]]
 
-Deleted files get sent to the graveyard (=/tmp/.graveyard= by default, under their absolute path) instead of being unlinked, giving you a chance to recover them.
+=rip= is a command-line deletion tool focused on safety, ergonomics, and performance.  It does /not/ implement the xdg-trash spec.
+
+Deleted files get sent to the graveyard (=/tmp/.graveyard= by default) under their absolute path, giving you a chance to recover them.
 
 No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
 
@@ -26,7 +28,7 @@ FLAGS:
     -h, --help         Prints help information
     -i, --inspect      Print some info about TARGET before prompting for action
     -r, --resurrect    Undo the last removal by the current user
-    -s, --seance       List all objects in the graveyard that were sent from the current directory
+    -s, --seance       Print files that were sent under the current directory
     -V, --version      Prints version information
 
 OPTIONS:
@@ -35,7 +37,42 @@ OPTIONS:
 ARGS:
     <TARGET>...    File or directory to remove
 #+END_EXAMPLE
-
+Basic usage - same as rm
+#+BEGIN_EXAMPLE
+$ rip file1 hamilton/ dir1/
+#+END_EXAMPLE
+Print files that were deleted from under the current directory
+#+BEGIN_EXAMPLE
+$ rip -s
+/tmp/.graveyard/home/jack/file1
+/tmp/.graveyard/home/jack/dir1
+/tmp/.graveyard/home/jack/hamilton
+#+END_EXAMPLE
+Restore the last deleted file
+#+BEGIN_EXAMPLE
+$ rip -r
+Returned /tmp/.graveyard/home/jack/dir1 to /home/jack/dir1
+#+END_EXAMPLE
+Resolve name conflicts
+#+BEGIN_EXAMPLE
+$ touch file1
+$ rip file1
+$ rip -s
+/tmp/.graveyard/home/jack/file1
+/tmp/.graveyard/home/jack/hamilton
+/tmp/.graveyard/home/jack/file1.1
+#+END_EXAMPLE
+-r also takes a file sent from current dir, or the absolute path of a file in the graveyard
+#+BEGIN_EXAMPLE
+$ rip -r file1
+Returned /tmp/.graveyard/home/jack/file1.1 to /home/jack/file1
+#+END_EXAMPLE
+Combine -r and -s to restore everything printed by -s
+#+BEGIN_EXAMPLE
+$ rip -sr
+Returned /tmp/.graveyard/home/jack/hamilto to /home/jack/hamilton
+Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1.1
+#+END_EXAMPLE
 *** Notes
 - In general, a deletion followed by a =--resurrect= should be idempotent.
 - You probably shouldn't alias =rm= to =rip=.  =rm -r= is two characters longer, anyway.
