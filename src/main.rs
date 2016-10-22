@@ -142,13 +142,11 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                     println!("Returned {} to {}", entry.dest, orig.display());
                 }
             }
+            // Go through the record and remove all the exhumed graves
+            if let Err(e) = delete_lines_from_record(record, &graves_to_exhume) {
+                println!("Failed to delete resurrects from grave record: {}", e)
+            };
         }
-
-        // Go through the record and remove all the exhumed graves
-        if let Err(e) = delete_lines_from_record(record, &graves_to_exhume) {
-            println!("Failed to delete resurrects from grave record: {}", e)
-        };
-
         return;
     }
 
@@ -380,7 +378,7 @@ fn get_lines_to_delete<R: AsRef<Path>>(record: R, graves: &Vec<String>)
     Ok(BufReader::new(f)
        .lines()
        .filter_map(|l| l.ok())
-       .filter(|l| !graves.clone().into_iter()
+       .filter(|l| graves.clone().into_iter()
                .any(|y| y == record_entry(l).dest))
        .collect())
 }
