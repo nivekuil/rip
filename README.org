@@ -4,16 +4,9 @@
 
 =rip= is a command-line deletion tool focused on safety, ergonomics, and performance.  It does /not/ implement the xdg-trash spec.
 
-Deleted files get sent to the graveyard (=/tmp/.graveyard= by default) under their absolute path, giving you a chance to recover them.
+Deleted files get sent to the graveyard (=/tmp/.graveyard= by default) under their absolute path, giving you a chance to recover them.  No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
 
-No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
-
-If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
-1. Alias =rip= to =rip --graveyard ~/.local/share/Trash=
-2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=
-This can be a good idea because if the graveyard is mounted on an in-memory filesystem, (as /tmp is in Arch Linux), deleting large files can quickly fill up your RAM.  It's also much slower to move files across filesystems, although the delay should be minimal with an SSD.
-
-A deletion log is kept in the =.record=, found in the top level of the graveyard.
+=rip= is made for lazy people.  If any part of the interface could be more intuitive, please open an issue or pull request.
 
 ** Installation
 Get a binary [[https://github.com/nivekuil/rip/releases][release]] or run =cargo install rm-improved= with a nightly compiler.
@@ -37,7 +30,7 @@ OPTIONS:
 ARGS:
     <TARGET>...    File or directory to remove
 #+END_EXAMPLE
-Basic usage - same as rm
+Basic usage -- same as rm
 #+BEGIN_EXAMPLE
 $ rip file1 hamilton/ dir1/
 #+END_EXAMPLE
@@ -62,7 +55,7 @@ $ rip -s
 /tmp/.graveyard/home/jack/hamilton
 /tmp/.graveyard/home/jack/file1.1
 #+END_EXAMPLE
--r also takes a file sent from current dir, or the absolute path of a file in the graveyard
+-r also takes the path of a file in the graveyard
 #+BEGIN_EXAMPLE
 $ rip -r /tmp/.graveyard/home/jack/file1.1
 Returned /tmp/.graveyard/home/jack/file1.1 to /home/jack/file1
@@ -70,9 +63,14 @@ Returned /tmp/.graveyard/home/jack/file1.1 to /home/jack/file1
 Combine -r and -s to restore everything printed by -s
 #+BEGIN_EXAMPLE
 $ rip -sr
-Returned /tmp/.graveyard/home/jack/hamilto to /home/jack/hamilton
+Returned /tmp/.graveyard/home/jack/hamilton to /home/jack/hamilton
 Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1.1
 #+END_EXAMPLE
 *** Notes
 - In general, a deletion followed by a =--resurrect= should be idempotent.
 - You probably shouldn't alias =rm= to =rip=.  =rm -r= is two characters longer, anyway.
+- If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
+  1. Alias =rip= to =rip --graveyard ~/.local/share/Trash=
+  2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=.
+  This can be a good idea because if the graveyard is mounted on an in-memory filesystem, (as /tmp is in Arch Linux), deleting large files can quickly fill up your RAM.  It's also much slower to move files across filesystems, although the delay should be minimal with an SSD.
+- A deletion log is kept in =.record=, found in the top level of the graveyard.
