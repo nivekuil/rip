@@ -187,8 +187,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                             println!("> {}", line);
                         }
                     }
-                    if !prompt_yes(["Send {} to the graveyard?", target]
-                                   .concat().as_str()) {
+                    if !prompt_yes(&format!("Send {} to the graveyard?", target)) {
                         continue;
                     }
                 }
