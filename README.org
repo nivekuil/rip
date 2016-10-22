@@ -24,15 +24,15 @@ USAGE:
     rip [FLAGS] [OPTIONS] [TARGET]...
 
 FLAGS:
-    -d, --decompose    Permanently delete (unlink) the entire graveyard
+    -d, --decompose    Permanently deletes (unlink) the entire graveyard
     -h, --help         Prints help information
-    -i, --inspect      Print some info about TARGET before prompting for action
-    -r, --resurrect    Undo the last removal by the current user
-    -s, --seance       Print files that were sent under the current directory
+    -i, --inspect      Prints some info about TARGET before prompting for action
+    -s, --seance       Prints files that were sent under the current directory
     -V, --version      Prints version information
 
 OPTIONS:
         --graveyard <graveyard>    Directory where deleted files go to rest
+    -r, --resurrect <target>       Undo the last removal by the current user, or specify some file(s) in the graveyard.  Combine with -s to restore everything printed by -s.
 
 ARGS:
     <TARGET>...    File or directory to remove
