@@ -64,7 +64,7 @@ $ rip -s
 #+END_EXAMPLE
 -r also takes a file sent from current dir, or the absolute path of a file in the graveyard
 #+BEGIN_EXAMPLE
-$ rip -r file1
+$ rip -r /tmp/.graveyard/home/jack/file1.1
 Returned /tmp/.graveyard/home/jack/file1.1 to /home/jack/file1
 #+END_EXAMPLE
 Combine -r and -s to restore everything printed by -s
