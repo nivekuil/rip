@@ -157,8 +157,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             for line in BufReader::new(f)
                 .lines()
                 .filter_map(|l| l.ok())
-                .filter(|l| record_entry(l).dest
-                        .starts_with(path.to_str().unwrap())) {
+                .map(|l| record_entry(&l).dest.to_string())
+                .filter(|l| l.starts_with(path.to_str().unwrap())) {
                     println!("{}", line);
                 }
         }
