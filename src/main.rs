@@ -225,7 +225,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             if let Err(e) = bury(source, dest) {
                 println!("ERROR: {}: {}", e, target);
                 // Clean up any partial buries due to permission error
-                fs::remove_dir_all(dest).expect("Failed to clean up");
+                fs::remove_dir_all(dest).is_ok();
             } else if let Err(e) = write_log(source, dest, record) {
                 println!("Error adding {} to record: {}", target, e);
             }
