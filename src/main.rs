@@ -25,6 +25,7 @@ include!("util.rs");
 static GRAVEYARD: &'static str = "/tmp/.graveyard";
 static RECORD: &'static str = ".record";
 const LINES_TO_INSPECT: usize = 6;
+const BIG_FILE_THRESHOLD: u64 = 500000000; // 500 MB
 
 struct RecordItem<'a> {
     user: &'a str,
@@ -304,11 +305,18 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
     let metadata = fs::symlink_metadata(source)?;
     let filetype = metadata.file_type();
 
+    if metadata.len() > BIG_FILE_THRESHOLD {
+        println!("About to copy a big file ({} bytes)", metadata.len());
+        if prompt_yes("Permanently delete this file instead?") {
+            return Ok(())
+        }
+    }
+
     if filetype.is_file() {
         if let Err(e) = fs::copy(source, dest) {
             println!("Failed to copy {} to {}",
                      source.display(), dest.display());
-            return Err(e);
+            return Err(e)
         }
     } else if filetype.is_fifo() {
         let mode = metadata.permissions().mode();
