@@ -15,15 +15,11 @@ use std::fs;
 use std::env;
 use std::io;
 use std::io::{Read, Write, BufRead, BufReader};
-use std::os::unix::fs::FileTypeExt;
-use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::fs::DirBuilderExt;
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::fs::MetadataExt;
+use std::os::unix::fs::{FileTypeExt, OpenOptionsExt, DirBuilderExt, PermissionsExt};
 include!("util.rs");
 
-static GRAVEYARD: &'static str = "/tmp/.graveyard";
-static RECORD: &'static str = ".record";
+const GRAVEYARD: &'static str = "/tmp/.graveyard";
+const RECORD: &'static str = ".record";
 const LINES_TO_INSPECT: usize = 6;
 const BIG_FILE_THRESHOLD: u64 = 500000000; // 500 MB
 
@@ -87,11 +83,11 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
     }
 
     let record: &Path = &graveyard.join(RECORD);
+    let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
     // Disable umask so rip can create a globally writable graveyard
     unsafe {
         libc::umask(0);
     }
-    let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
 
     if let Some(mut s) = matches.values_of("resurrect") {
         // Vector to hold the grave path of items we want to resurrect.
@@ -128,7 +124,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         }
 
         // Go through the graveyard and exhume all the graves
-        if let Ok(lines) = get_lines_to_delete(record, &graves_to_exhume) {
+        if let Ok(lines) = lines_of_graves(record, &graves_to_exhume) {
             for line in lines {
                 let entry = record_entry(&line);
                 let orig: &Path = &{
@@ -173,14 +169,16 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
 
             // Check if source exists
             if let Ok(metadata) = source.symlink_metadata() {
+
                 if matches.is_present("inspect") {
                     if metadata.is_dir() {
+                        // Get the size of the directory and all its contents
                         println!("{}: directory, {} bytes", target,
                                  WalkDir::new(source)
                                  .into_iter()
                                  .filter_map(|x| x.ok())
                                  .filter_map(|x| x.metadata().ok())
-                                 .map(|x| x.size())
+                                 .map(|x| x.len())
                                  .sum::<u64>());
                     } else {
                         println!("{}: file, {} bytes", target, metadata.len());
@@ -201,6 +199,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                         continue;
                     }
                 }
+
             } else {
                 println!("Cannot remove {}: no such file or directory", target);
                 return;
@@ -268,8 +267,11 @@ fn bury<S, D>(source: S, dest: D) -> io::Result<()>
     }
 
     // If that didn't work, then copy and rm.
+    // All parent directories are created with open permissions so that
+    // other users can delete things too
     let parent = dest.parent().expect("Trying to delete root?");
     fs::DirBuilder::new().mode(0o777).recursive(true).create(parent)?;
+
     if fs::symlink_metadata(source)?.is_dir() {
         // Walk the source, creating directories and copying files as needed
         for entry in WalkDir::new(source).into_iter().filter_map(|e| e.ok()) {
@@ -332,7 +334,7 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
         if let Err(e) = fs::copy(source, dest) {
             println!("Non-regular file or directory: {}", source.display());
             if !prompt_yes("Permanently delete the file?") {
-                return Err(e);
+                return Err(e)
             }
             // Create a dummy file to act as a marker in the graveyard
             let mut marker = fs::File::create(dest)?;
@@ -343,14 +345,6 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
 
     Ok(())
 }
-
-// fn warn_big_file(filedata: fs::Metadata) -> bool {
-//     let threshold = 500000000;
-//     if filedata.size() > threshold {
-//         println!("About to copy a big file ({} bytes}", filedata.len());
-//         return prompt_yes("Permanently delete this file instead?")
-//     }
-// }
 
 /// Return the line in record corresponding to the last buried file still in
 /// the graveyard
@@ -387,7 +381,8 @@ fn record_entry(line: &String) -> RecordItem {
     RecordItem { user: user, orig: orig, dest: dest }
 }
 
-fn get_lines_to_delete<R: AsRef<Path>>(record: R, graves: &Vec<String>)
+/// Takes a vector of grave paths and returns the respective lines in the record
+fn lines_of_graves<R: AsRef<Path>>(record: R, graves: &Vec<String>)
                                        -> io::Result<Vec<String>> {
     let record = record.as_ref();
     let f = fs::File::open(record)?;
@@ -399,6 +394,7 @@ fn get_lines_to_delete<R: AsRef<Path>>(record: R, graves: &Vec<String>)
        .collect())
 }
 
+/// Takes a vector of grave paths and removes the respective lines from the record
 fn delete_lines_from_record<R: AsRef<Path>>(record: R, graves: &Vec<String>)
                                             -> io::Result<()> {
     let record = record.as_ref();
