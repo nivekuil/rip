@@ -16,6 +16,20 @@ matrix:
       rust: nightly
       env: TARGET=x86_64-apple-darwin
       sudo: required
+    - os: linux
+      rust: nightly
+      env: TARGET=armv7-unknown-linux-gnueabihf
+      sudo: required
+      addons:
+        apt:
+          packages:
+            # Cross compiler and cross compiled C libraries
+            - gcc-arm-linux-gnueabihf
+            - libc6-armhf-cross
+            - libc6-dev-armhf-cross
+            # Transparent emulation
+            - qemu-user-static
+            - binfmt-support
 
 before_install:
   - export PATH="$PATH:$HOME/.cargo/bin"
