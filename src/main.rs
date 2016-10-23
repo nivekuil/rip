@@ -21,6 +21,7 @@ include!("util.rs");
 const GRAVEYARD: &'static str = "/tmp/.graveyard";
 const RECORD: &'static str = ".record";
 const LINES_TO_INSPECT: usize = 6;
+const FILES_TO_INSPECT: usize = 6;
 const BIG_FILE_THRESHOLD: u64 = 500000000; // 500 MB
 
 struct RecordItem<'a> {
@@ -170,24 +171,29 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                 if matches.is_present("inspect") {
                     if metadata.is_dir() {
                         // Get the size of the directory and all its contents
-                        println!("{}: directory, {} bytes", target,
+                        println!("{}: directory, {} bytes including:", target,
                                  WalkDir::new(source)
                                  .into_iter()
                                  .filter_map(|x| x.ok())
                                  .filter_map(|x| x.metadata().ok())
                                  .map(|x| x.len())
                                  .sum::<u64>());
+                        // Print the first few top-level files in the directory
+                        for entry in WalkDir::new(source)
+                            .min_depth(1).max_depth(1).into_iter()
+                            .take(FILES_TO_INSPECT) {
+                                println!("{}", entry.unwrap().path().display());
+                            }
                     } else {
                         println!("{}: file, {} bytes", target, metadata.len());
-                        // Read the file and print the first 6 lines
+                        // Read the file and print the first few lines
                         if let Ok(f) = fs::File::open(source) {
-                            let lines_to_print = BufReader::new(f)
+                            for line in BufReader::new(f)
                                 .lines()
                                 .take(LINES_TO_INSPECT)
-                                .filter_map(|line| line.ok());
-                            for line in lines_to_print {
-                                println!("> {}", line);
-                            }
+                                .filter_map(|line| line.ok()) {
+                                    println!("> {}", line);
+                                }
                         } else {
                             println!("Error reading {}", source.display());
                         }
@@ -207,7 +213,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             if source.starts_with(graveyard) {
                 println!("{} is already in the graveyard.", source.display());
                 if prompt_yes("Permanently unlink it?") {
-                    if let Err(_) = fs::remove_dir_all(source) {
+                    if fs::remove_dir_all(source).is_err() {
                         if let Err(e) = fs::remove_file(source) {
                             println!("Couldn't unlink {}:", e);
                         }
@@ -399,8 +405,7 @@ fn delete_lines_from_record<R: AsRef<Path>>(record: R, graves: &[String])
         BufReader::new(f)
             .lines()
             .filter_map(|l| l.ok())
-            .filter(|l| !graves.into_iter()
-                    .any(|y| y == record_entry(l).dest))
+            .filter(|l| !graves.into_iter().any(|y| y == record_entry(l).dest))
             .collect()
     };
     let mut f = fs::File::create(record)?;
