@@ -8,10 +8,9 @@ Deleted files get sent to the graveyard (=/tmp/.graveyard= by default) under the
 
 =rip= is made for lazy people.  If any part of the interface could be more intuitive, please open an issue or pull request.
 
-** Installation
+** ⚰ Installation
 Get a binary [[https://github.com/nivekuil/rip/releases][release]] or run =cargo install rm-improved= with a nightly compiler.
-
-** Usage
+** ⚰ Usage
 #+BEGIN_EXAMPLE
 USAGE:
     rip [FLAGS] [OPTIONS] [TARGET]...
@@ -66,7 +65,7 @@ $ rip -sr
 Returned /tmp/.graveyard/home/jack/hamilton to /home/jack/hamilton
 Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1~1
 #+END_EXAMPLE
-*** Notes
+** ⚰ Notes
 - In general, a deletion followed by a =--resurrect= should be idempotent.
 - You probably shouldn't alias =rm= to =rip=.  =rm -r= will also get really confusing.
 - If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
