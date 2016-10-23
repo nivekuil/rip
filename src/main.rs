@@ -89,11 +89,14 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         libc::umask(0);
     }
 
-    if let Some(s) = matches.values_of("resurrect") {
+    if let Some(res_targets) = matches.values_of("resurrect") {
         // Vector to hold the grave path of items we want to resurrect.
         // This will be used to determine which items to remove from the
         // record following the resurrect.
-        let mut graves_to_exhume: Vec<String> = Vec::new();
+        // Initialize it with the arguments passed to -r
+        let mut graves_to_exhume: Vec<String> = res_targets
+            .map(|x| x.to_string()).collect();
+
         // If -s is also passed, push all files found by seance onto
         // the graves_to_exhume.
         if matches.is_present("seance") {
@@ -108,11 +111,6 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                     graves_to_exhume.push(grave);
                 }
             }
-        }
-
-        // Add any arguments passed to --resurrect
-        for grave in s {
-            graves_to_exhume.push(grave.to_string());
         }
 
         // Otherwise, add the last deleted file
