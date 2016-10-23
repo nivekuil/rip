@@ -89,7 +89,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         libc::umask(0);
     }
 
-    if let Some(mut s) = matches.values_of("resurrect") {
+    if let Some(s) = matches.values_of("resurrect") {
         // Vector to hold the grave path of items we want to resurrect.
         // This will be used to determine which items to remove from the
         // record following the resurrect.
@@ -111,12 +111,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         }
 
         // Add any arguments passed to --resurrect
-        while let Some(grave) = s.next() {
+        for grave in s {
             graves_to_exhume.push(grave.to_string());
         }
 
         // Otherwise, add the last deleted file
-        if graves_to_exhume.len() == 0 {
+        if graves_to_exhume.is_empty() {
             if let Ok(s) = get_last_bury(record) {
                 let grave = record_entry(&s).dest;
                 graves_to_exhume.push(grave.to_string());
@@ -329,18 +329,16 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
     } else if filetype.is_symlink() {
         let target = fs::read_link(source)?;
         std::os::unix::fs::symlink(target, dest)?;
-    } else {
+    } else if let Err(e) = fs::copy(source, dest) {
         // Special file: Try copying it as normal, but this probably won't work
-        if let Err(e) = fs::copy(source, dest) {
-            println!("Non-regular file or directory: {}", source.display());
-            if !prompt_yes("Permanently delete the file?") {
-                return Err(e)
-            }
-            // Create a dummy file to act as a marker in the graveyard
-            let mut marker = fs::File::create(dest)?;
-            marker.write_all(b"This is a marker for a file that was \
-                               permanently deleted.  Requiescat in pace.")?;
+        println!("Non-regular file or directory: {}", source.display());
+        if !prompt_yes("Permanently delete the file?") {
+            return Err(e)
         }
+        // Create a dummy file to act as a marker in the graveyard
+        let mut marker = fs::File::create(dest)?;
+        marker.write_all(b"This is a marker for a file that was \
+                           permanently deleted.  Requiescat in pace.")?;
     }
 
     Ok(())
@@ -365,16 +363,16 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
             return Ok(line.clone())
         } else {
             // File was moved, remove the line from record
-            delete_lines_from_record(record, &vec![line.clone()])?;
+            delete_lines_from_record(record, &[line.clone()])?;
         }
     }
 
     Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
 }
 
-/// Parse a line in the record into a RecordItem
-fn record_entry(line: &String) -> RecordItem {
-    let mut tokens = line.split("\t");
+/// Parse a line in the record into a `RecordItem`
+fn record_entry(line: &str) -> RecordItem {
+    let mut tokens = line.split('\t');
     let user: &str = tokens.next().expect("Bad format: column A");
     let orig: &str = tokens.next().expect("Bad format: column B");
     let dest: &str = tokens.next().expect("Bad format: column C");
@@ -382,20 +380,19 @@ fn record_entry(line: &String) -> RecordItem {
 }
 
 /// Takes a vector of grave paths and returns the respective lines in the record
-fn lines_of_graves<R: AsRef<Path>>(record: R, graves: &Vec<String>)
+fn lines_of_graves<R: AsRef<Path>>(record: R, graves: &[String])
                                        -> io::Result<Vec<String>> {
     let record = record.as_ref();
     let f = fs::File::open(record)?;
     Ok(BufReader::new(f)
        .lines()
        .filter_map(|l| l.ok())
-       .filter(|l| graves.clone().into_iter()
-               .any(|y| y == record_entry(l).dest))
+       .filter(|l| graves.into_iter().any(|y| y == record_entry(l).dest))
        .collect())
 }
 
 /// Takes a vector of grave paths and removes the respective lines from the record
-fn delete_lines_from_record<R: AsRef<Path>>(record: R, graves: &Vec<String>)
+fn delete_lines_from_record<R: AsRef<Path>>(record: R, graves: &[String])
                                             -> io::Result<()> {
     let record = record.as_ref();
     // Get the lines to write back to record, which is every line except
@@ -405,7 +402,7 @@ fn delete_lines_from_record<R: AsRef<Path>>(record: R, graves: &Vec<String>)
         BufReader::new(f)
             .lines()
             .filter_map(|l| l.ok())
-            .filter(|l| !graves.clone().into_iter()
+            .filter(|l| !graves.into_iter()
                     .any(|y| y == record_entry(l).dest))
             .collect()
     };
