@@ -89,13 +89,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         libc::umask(0);
     }
 
-    if let Some(res_targets) = matches.values_of("resurrect") {
+    if let Some(t) = matches.values_of("resurrect") {
         // Vector to hold the grave path of items we want to resurrect.
         // This will be used to determine which items to remove from the
         // record following the resurrect.
-        // Initialize it with the arguments passed to -r
-        let mut graves_to_exhume: Vec<String> = res_targets
-            .map(|x| x.to_string()).collect();
+        // Initialize it with the targets passed to -r
+        let mut graves_to_exhume: Vec<String> = t.map(String::from).collect();
 
         // If -s is also passed, push all files found by seance onto
         // the graves_to_exhume.
@@ -350,7 +349,7 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
 
-    for line in contents.lines().rev().map(|x| x.to_string()) {
+    for line in contents.lines().rev().map(String::from) {
         let entry = record_entry(&line);
         // Only resurrect files buried by the same user
         if entry.user != get_user() { continue }
