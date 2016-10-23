@@ -30,41 +30,41 @@ OPTIONS:
 ARGS:
     <TARGET>...    File or directory to remove
 #+END_EXAMPLE
-⚰ Basic usage -- easier than rm
+Basic usage -- easier than rm
 #+BEGIN_EXAMPLE
 $ rip file1 hamilton/ dir1/
 #+END_EXAMPLE
-⚰ Print files that were deleted from under the current directory
+Print files that were deleted from under the current directory
 #+BEGIN_EXAMPLE
 $ rip -s
 /tmp/.graveyard/home/jack/file1
 /tmp/.graveyard/home/jack/dir1
 /tmp/.graveyard/home/jack/hamilton
 #+END_EXAMPLE
-⚰ Restore the last deleted file
+Undo the last deletion
 #+BEGIN_EXAMPLE
 $ rip -r
 Returned /tmp/.graveyard/home/jack/dir1 to /home/jack/dir1
 #+END_EXAMPLE
-⚰ Resolve name conflicts
+Resolve name conflicts
 #+BEGIN_EXAMPLE
 $ touch file1
 $ rip file1
 $ rip -s
 /tmp/.graveyard/home/jack/file1
 /tmp/.graveyard/home/jack/hamilton
-/tmp/.graveyard/home/jack/file1.1
+/tmp/.graveyard/home/jack/file1~1
 #+END_EXAMPLE
-⚰ -r also takes the path of a file in the graveyard
+-r also takes the path of a file in the graveyard
 #+BEGIN_EXAMPLE
-$ rip -r /tmp/.graveyard/home/jack/file1.1
-Returned /tmp/.graveyard/home/jack/file1.1 to /home/jack/file1
+$ rip -r /tmp/.graveyard/home/jack/file1~1
+Returned /tmp/.graveyard/home/jack/file1~1 to /home/jack/file1
 #+END_EXAMPLE
-⚰ Combine -r and -s to restore everything printed by -s
+Combine -r and -s to restore everything printed by -s
 #+BEGIN_EXAMPLE
 $ rip -sr
 Returned /tmp/.graveyard/home/jack/hamilton to /home/jack/hamilton
-Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1.1
+Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1~1
 #+END_EXAMPLE
 *** Notes
 - In general, a deletion followed by a =--resurrect= should be idempotent.
@@ -72,5 +72,5 @@ Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1.1
 - If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
   1. Alias =rip= to =rip --graveyard ~/.local/share/Trash=
   2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=.
-  This can be a good idea because if the graveyard is mounted on an in-memory filesystem, (as /tmp is in Arch Linux), deleting large files can quickly fill up your RAM.  It's also much slower to move files across filesystems, although the delay should be minimal with an SSD.
-- A deletion log is kept in =.record=, found in the top level of the graveyard.
+  This can be a good idea because if the graveyard is mounted on an in-memory filesystem (as /tmp is in Arch Linux), deleting large files can quickly fill up your RAM.  It's also much slower to move files across filesystems, although the delay should be minimal with an SSD.
+- The deletion log is kept in =.record=, found in the top level of the graveyard.

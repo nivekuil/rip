@@ -22,24 +22,10 @@ fn prompt_yes(prompt: &str) -> bool {
 /// Add a numbered extension to duplicate filenames to avoid overwriting files.
 fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
     let grave = grave.as_ref();
-    if grave.extension().is_none() {
-        (1_u64..)
-            .map(|i| grave.with_extension(i.to_string()))
-            .skip_while(|p| symlink_exists(p))
-            .next()
-            .expect("Failed to rename duplicate file or directory")
-    } else {
-        (1_u64..)
-            .map(|i| {
-                grave.with_extension(format!("{}.{}",
-                                             grave.extension()
-                                             .unwrap()
-                                             .to_str()
-                                             .unwrap(),
-                                             i))
-            })
-            .skip_while(|p| symlink_exists(p))
-            .next()
-            .expect("Failed to rename duplicate file or directory")
-    }
+    let name = grave.to_str().expect("Filename must be valid unicode.");
+    (1_u64..)
+        .map(|i| PathBuf::from(format!("{}~{}", name, i)))
+        .skip_while(|p| symlink_exists(p))
+        .next()
+        .expect("Failed to rename duplicate file or directory")
 }
