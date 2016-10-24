@@ -9,7 +9,7 @@ Deleted files get sent to the graveyard (=/tmp/.graveyard= by default) under the
 =rip= is made for lazy people.  If any part of the interface could be more intuitive, please open an issue or pull request.
 
 ** ⚰ Installation
-Get a binary [[https://github.com/nivekuil/rip/releases][release]] or run =cargo install rm-improved= with a nightly compiler.
+Get a binary [[https://github.com/nivekuil/rip/releases][release]] (Linux x86_64, ARMv7 and macOS) or run =cargo install rm-improved= with a nightly rustc.
 ** ⚰ Usage
 #+BEGIN_EXAMPLE
 USAGE:
@@ -31,39 +31,46 @@ ARGS:
 #+END_EXAMPLE
 Basic usage -- easier than rm
 #+BEGIN_EXAMPLE
-$ rip file1 hamilton/ dir1/
+$ rip dir1/ file1
+#+END_EXAMPLE
+Undo the last deletion
+#+BEGIN_EXAMPLE
+$ rip -r
+Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1
+#+END_EXAMPLE
+Print some info (size and first few lines in a file, total size and first few files in a directory) about the target and then prompt for deletion
+#+BEGIN_EXAMPLE
+$ rip -i file1
+dir1: file, 1337 bytes including:
+> Position: Shooting Guard and Small Forward ▪ Shoots: Right
+> 6-6, 185lb (198cm, 83kg)
+Send file1 to the graveyard? (y/n) y
 #+END_EXAMPLE
 Print files that were deleted from under the current directory
 #+BEGIN_EXAMPLE
 $ rip -s
 /tmp/.graveyard/home/jack/file1
 /tmp/.graveyard/home/jack/dir1
-/tmp/.graveyard/home/jack/hamilton
 #+END_EXAMPLE
-Undo the last deletion
-#+BEGIN_EXAMPLE
-$ rip -r
-Returned /tmp/.graveyard/home/jack/dir1 to /home/jack/dir1
-#+END_EXAMPLE
-Resolve name conflicts
+Name conflicts are resolved
 #+BEGIN_EXAMPLE
 $ touch file1
 $ rip file1
 $ rip -s
+/tmp/.graveyard/home/jack/dir1
 /tmp/.graveyard/home/jack/file1
-/tmp/.graveyard/home/jack/hamilton
 /tmp/.graveyard/home/jack/file1~1
 #+END_EXAMPLE
 -r also takes the path of a file in the graveyard
 #+BEGIN_EXAMPLE
-$ rip -r /tmp/.graveyard/home/jack/file1~1
-Returned /tmp/.graveyard/home/jack/file1~1 to /home/jack/file1
+$ rip -r /tmp/.graveyard/home/jack/file1
+Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1
 #+END_EXAMPLE
 Combine -r and -s to restore everything printed by -s
 #+BEGIN_EXAMPLE
 $ rip -sr
-Returned /tmp/.graveyard/home/jack/hamilton to /home/jack/hamilton
-Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1~1
+Returned /tmp/.graveyard/home/jack/dir1 to /home/jack/dir1
+Returned /tmp/.graveyard/home/jack/file1~1 to /home/jack/file1~1
 #+END_EXAMPLE
 ** ⚰ Notes
 - In general, a deletion followed by a =--resurrect= should be idempotent.
