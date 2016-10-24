@@ -171,13 +171,15 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                 if matches.is_present("inspect") {
                     if metadata.is_dir() {
                         // Get the size of the directory and all its contents
-                        println!("{}: directory, {} bytes including:", target,
-                                 WalkDir::new(source)
-                                 .into_iter()
-                                 .filter_map(|x| x.ok())
-                                 .filter_map(|x| x.metadata().ok())
-                                 .map(|x| x.len())
-                                 .sum::<u64>());
+                        println!("{}: directory, {} including:", target,
+                                  humanize_bytes(
+                                      WalkDir::new(source)
+                                          .into_iter()
+                                          .filter_map(|x| x.ok())
+                                          .filter_map(|x| x.metadata().ok())
+                                          .map(|x| x.len())
+                                          .sum::<u64>()));
+                                 
                         // Print the first few top-level files in the directory
                         for entry in WalkDir::new(source)
                             .min_depth(1).max_depth(1).into_iter()
@@ -185,7 +187,8 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                                 println!("{}", entry.unwrap().path().display());
                             }
                     } else {
-                        println!("{}: file, {} bytes", target, metadata.len());
+                        println!("{}: file, {}", target,
+                                 humanize_bytes(metadata.len()));
                         // Read the file and print the first few lines
                         if let Ok(f) = fs::File::open(source) {
                             for line in BufReader::new(f)

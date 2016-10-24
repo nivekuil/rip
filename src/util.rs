@@ -29,3 +29,13 @@ fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
         .next()
         .expect("Failed to rename duplicate file or directory")
 }
+
+fn humanize_bytes(bytes: u64) -> String {
+    let values = ["bytes", "KB", "MB", "GB", "TB"];
+    let pair = values.iter()
+        .enumerate()
+        .take_while(|x| bytes as usize / (1000 as usize).pow(x.0 as u32) > 10)
+        .last()
+        .unwrap();
+    format!("{} {}", bytes as usize / (1000 as usize).pow(pair.0 as u32), pair.1)
+}
