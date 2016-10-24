@@ -35,7 +35,10 @@ fn humanize_bytes(bytes: u64) -> String {
     let pair = values.iter()
         .enumerate()
         .take_while(|x| bytes as usize / (1000 as usize).pow(x.0 as u32) > 10)
-        .last()
-        .unwrap();
-    format!("{} {}", bytes as usize / (1000 as usize).pow(pair.0 as u32), pair.1)
+        .last();
+    if let Some(p) = pair {
+        format!("{} {}", bytes as usize / (1000 as usize).pow(p.0 as u32), p.1)
+    } else {
+        format!("{} {}", bytes, values[0])
+    }
 }

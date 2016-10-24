@@ -183,8 +183,9 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
                         // Print the first few top-level files in the directory
                         for entry in WalkDir::new(source)
                             .min_depth(1).max_depth(1).into_iter()
+                            .filter_map(|entry| entry.ok())
                             .take(FILES_TO_INSPECT) {
-                                println!("{}", entry.unwrap().path().display());
+                                println!("{}", entry.path().display());
                             }
                     } else {
                         println!("{}: file, {}", target,
