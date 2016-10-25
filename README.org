@@ -9,7 +9,16 @@ Deleted files get sent to the graveyard (=/tmp/.graveyard= by default) under the
 =rip= is made for lazy people.  If any part of the interface could be more intuitive, please open an issue or pull request.
 
 ** ⚰ Installation
-Get a binary [[https://github.com/nivekuil/rip/releases][release]] (Linux x86_64, ARMv7 and macOS) or run =cargo install rm-improved= with a nightly rustc.
+Get a binary [[https://github.com/nivekuil/rip/releases][release]] (Linux x86_64, ARMv7 and macOS), untar it, and move it somewhere on your $PATH:
+#+BEGIN_EXAMPLE
+$ tar xvzf rip-*.tar.gz
+$ mv rip /usr/local/bin
+#+END_EXAMPLE
+
+or build it with a nightly rustc:
+#+BEGIN_EXAMPLE
+$ cargo install rm-improved
+#+END_EXAMPLE
 ** ⚰ Usage
 #+BEGIN_EXAMPLE
 USAGE:
