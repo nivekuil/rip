@@ -315,7 +315,8 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
     let filetype = metadata.file_type();
 
     if metadata.len() > BIG_FILE_THRESHOLD {
-        println!("About to copy a big file ({} bytes)", metadata.len());
+        println!("About to copy a big file ({} is {})", source.display(),
+                 humanize_bytes(metadata.len()));
         if prompt_yes("Permanently delete this file instead?") {
             return Ok(())
         }
