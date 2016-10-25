@@ -52,12 +52,12 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
              .help("Prints files that were sent under the current directory")
              .short("s")
              .long("seance"))
-        .arg(Arg::with_name("resurrect")
+        .arg(Arg::with_name("unbury")
              .help("Undo the last removal by the current user, or specify \
                     some file(s) in the graveyard.  Combine with -s to \
                     restore everything printed by -s.")
-             .short("r")
-             .long("resurrect")
+             .short("u")
+             .long("unbury")
              .value_name("target")
              .min_values(0))
         .arg(Arg::with_name("inspect")
@@ -90,10 +90,10 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         libc::umask(0);
     }
 
-    if let Some(t) = matches.values_of("resurrect") {
-        // Vector to hold the grave path of items we want to resurrect.
+    if let Some(t) = matches.values_of("unbury") {
+        // Vector to hold the grave path of items we want to unbury.
         // This will be used to determine which items to remove from the
-        // record following the resurrect.
+        // record following the unbury.
         // Initialize it with the targets passed to -r
         let mut graves_to_exhume: Vec<String> = t.map(String::from).collect();
 
@@ -140,7 +140,7 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
             }
             // Go through the record and remove all the exhumed graves
             if let Err(e) = delete_lines_from_record(record, &graves_to_exhume) {
-                println!("Failed to delete resurrects from grave record: {}", e)
+                println!("Failed to delete unburys from grave record: {}", e)
             };
         }
         return;
@@ -362,7 +362,7 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
 
     for line in contents.lines().rev().map(String::from) {
         let entry = record_entry(&line);
-        // Only resurrect files buried by the same user
+        // Only unbury files buried by the same user
         if entry.user != get_user() { continue }
 
         // Check that the file is still in the graveyard.
