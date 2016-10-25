@@ -1,4 +1,4 @@
-* ⚰ rip (Rm ImProved) ⚰
+* rip (Rm ImProved)
 [[https://crates.io/crates/rm-improved][https://img.shields.io/crates/v/rm-improved.svg]]
 [[https://travis-ci.org/nivekuil/rip][https://travis-ci.org/nivekuil/rip.svg?branch=master]]
 
