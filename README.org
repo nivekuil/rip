@@ -82,7 +82,7 @@ Returned /tmp/.graveyard/home/jack/dir1 to /home/jack/dir1
 Returned /tmp/.graveyard/home/jack/file1~1 to /home/jack/file1~1
 #+END_EXAMPLE
 ** ⚰ Notes
-- You probably shouldn't alias =rm= to =rip=.  Unlearning muscle memory is hard, but it's harder to ensure that every =rm= you make (as different users, from different machines and applicaiton environments) is the aliased one.
+- You probably shouldn't alias =rm= to =rip=.  Unlearning muscle memory is hard, but it's harder to ensure that every =rm= you make (as different users, from different machines and application environments) is the aliased one.
 - If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
   1. Alias =rip= to =rip --graveyard ~/.local/share/Trash=
   2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=.
