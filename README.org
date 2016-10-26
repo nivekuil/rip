@@ -33,7 +33,7 @@ FLAGS:
 
 OPTIONS:
         --graveyard <graveyard>    Directory where deleted files go to rest
-    -r, --resurrect <target>       Undo the last removal by the current user, or specify some file(s) in the graveyard.  Combine with -s to restore everything printed by -s.
+    -u, --unbury <target>       Undo the last removal by the current user, or specify some file(s) in the graveyard.  Combine with -s to restore everything printed by -s.
 
 ARGS:
     <TARGET>...    File or directory to remove
@@ -44,7 +44,7 @@ $ rip dir1/ file1
 #+END_EXAMPLE
 Undo the last deletion
 #+BEGIN_EXAMPLE
-$ rip -r
+$ rip -u
 Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1
 #+END_EXAMPLE
 Print some info (size and first few lines in a file, total size and first few files in a directory) about the target and then prompt for deletion
@@ -70,20 +70,20 @@ $ rip -s
 /tmp/.graveyard/home/jack/file1
 /tmp/.graveyard/home/jack/file1~1
 #+END_EXAMPLE
--r also takes the path of a file in the graveyard
+-u also takes the path of a file in the graveyard
 #+BEGIN_EXAMPLE
-$ rip -r /tmp/.graveyard/home/jack/file1
+$ rip -u /tmp/.graveyard/home/jack/file1
 Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1
 #+END_EXAMPLE
-Combine -r and -s to restore everything printed by -s
+Combine -u and -s to restore everything printed by -s
 #+BEGIN_EXAMPLE
-$ rip -sr
+$ rip -su
 Returned /tmp/.graveyard/home/jack/dir1 to /home/jack/dir1
 Returned /tmp/.graveyard/home/jack/file1~1 to /home/jack/file1~1
 #+END_EXAMPLE
 ** ⚰ Notes
-- In general, a deletion followed by a =--resurrect= should be idempotent.
-- You probably shouldn't alias =rm= to =rip=.  =rm -r= will also get really confusing.
+- You probably shouldn't alias =rm= to =rip=.  Unlearning muscle memory is hard, but it's harder to ensure that every =rm= you make (as different users, from different machines and applicaiton environments) is the aliased one.
+- In general, a deletion followed by a =--unbury= should be idempotent.
 - If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
   1. Alias =rip= to =rip --graveyard ~/.local/share/Trash=
   2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=.
