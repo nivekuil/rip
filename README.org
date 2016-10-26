@@ -2,9 +2,9 @@
 [[https://crates.io/crates/rm-improved][https://img.shields.io/crates/v/rm-improved.svg]]
 [[https://travis-ci.org/nivekuil/rip][https://travis-ci.org/nivekuil/rip.svg?branch=master]]
 
-=rip= is a command-line deletion tool focused on safety, ergonomics, and performance.  It does /not/ implement the xdg-trash spec.
+=rip= is a command-line deletion tool focused on safety, ergonomics, and performance.  It favors a simple interface, and does /not/ implement the xdg-trash spec or attempt to achieve the same goals.
 
-Deleted files get sent to the graveyard (=/tmp/.graveyard= by default) under their absolute path, giving you a chance to recover them.  No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
+Deleted files get sent to the graveyard (=/tmp/.graveyard= by default, see [[https://github.com/nivekuil/rip#-notes][notes]] on changing this) under their absolute path, giving you a chance to recover them.  No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
 
 =rip= is made for lazy people.  If any part of the interface could be more intuitive, please open an issue or pull request.
 
@@ -83,9 +83,9 @@ Returned /tmp/.graveyard/home/jack/file1~1 to /home/jack/file1~1
 #+END_EXAMPLE
 ** ⚰ Notes
 - You probably shouldn't alias =rm= to =rip=.  Unlearning muscle memory is hard, but it's harder to ensure that every =rm= you make (as different users, from different machines and applicaiton environments) is the aliased one.
-- In general, a deletion followed by a =--unbury= should be idempotent.
 - If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
   1. Alias =rip= to =rip --graveyard ~/.local/share/Trash=
   2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=.
   This can be a good idea because if the graveyard is mounted on an in-memory filesystem (as /tmp is in Arch Linux), deleting large files can quickly fill up your RAM.  It's also much slower to move files across filesystems, although the delay should be minimal with an SSD.
+- In general, a deletion followed by a =--unbury= should be idempotent.
 - The deletion log is kept in =.record=, found in the top level of the graveyard.
