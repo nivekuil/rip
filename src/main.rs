@@ -95,7 +95,7 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
         // This will be used to determine which items to remove from the
         // record following the unbury.
         // Initialize it with the targets passed to -r
-        let mut graves_to_exhume: Vec<String> = t.map(String::from).collect();
+        let graves_to_exhume: &mut Vec<String> = &mut t.map(String::from).collect();
 
         // If -s is also passed, push all files found by seance onto
         // the graves_to_exhume.
@@ -122,7 +122,7 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
 
         // Go through the graveyard and exhume all the graves
         let f = &fs::File::open(record).unwrap();
-        for line in lines_of_graves(f, &graves_to_exhume) {
+        for line in lines_of_graves(f, graves_to_exhume) {
             let entry = record_entry(&line);
             let orig: &Path = &{
                 if symlink_exists(entry.orig) {
@@ -138,7 +138,7 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
             }
         }
         // Go through the record and remove all the exhumed graves
-        if let Err(e) = delete_lines_from_record(f, record, &graves_to_exhume) {
+        if let Err(e) = delete_lines_from_record(f, record, graves_to_exhume) {
             println!("Failed to delete unburys from grave record: {}", e)
         };
         return;
@@ -353,8 +353,8 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
 /// Return the path in the graveyard of the last file buried by the user
 fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
     let record = record.as_ref();
-    let mut graves_to_exhume: &mut Vec<String> = &mut Vec::new();
-    let mut f = fs::File::open(record)?;
+    let graves_to_exhume: &mut Vec<String> = &mut Vec::new();
+    let mut f = &fs::File::open(record)?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
 
@@ -366,7 +366,7 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
             // If it is, return the corresponding line.
             if symlink_exists(entry.dest) {
                 if !graves_to_exhume.is_empty() {
-                    delete_lines_from_record(&f, record, &graves_to_exhume)?;
+                    delete_lines_from_record(f, record, graves_to_exhume)?;
                 }
                 return Ok(String::from(entry.dest))
             } else {
@@ -376,7 +376,7 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
         }
 
     if !graves_to_exhume.is_empty() {
-        delete_lines_from_record(&f, record, &graves_to_exhume)?;
+        delete_lines_from_record(f, record, graves_to_exhume)?;
     }
     Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
 }
