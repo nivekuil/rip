@@ -361,19 +361,19 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
     // This could be cleaned up more if/when for loops can return a value
     for entry in contents.lines().rev()
         .map(record_entry)
-        .filter(|x| x.user != get_user()) {
-        // Check that the file is still in the graveyard.
-        // If it is, return the corresponding line.
-        if symlink_exists(entry.dest) {
-            if !graves_to_exhume.is_empty() {
-                delete_lines_from_record(&f, record, &graves_to_exhume)?;
+        .filter(|x| x.user == get_user()) {
+            // Check that the file is still in the graveyard.
+            // If it is, return the corresponding line.
+            if symlink_exists(entry.dest) {
+                if !graves_to_exhume.is_empty() {
+                    delete_lines_from_record(&f, record, &graves_to_exhume)?;
+                }
+                return Ok(String::from(entry.dest))
+            } else {
+                // File is gone, mark the grave to be removed from the record
+                graves_to_exhume.push(String::from(entry.dest));
             }
-            return Ok(String::from(entry.dest))
-        } else {
-            // File is gone, mark the grave to be removed from the record
-            graves_to_exhume.push(String::from(entry.dest));
         }
-    }
 
     if !graves_to_exhume.is_empty() {
         delete_lines_from_record(&f, record, &graves_to_exhume)?;
