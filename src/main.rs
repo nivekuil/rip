@@ -116,8 +116,7 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
         // Otherwise, add the last deleted file
         if graves_to_exhume.is_empty() {
             if let Ok(s) = get_last_bury(record) {
-                let grave = record_entry(&s).dest;
-                graves_to_exhume.push(grave.to_string());
+                graves_to_exhume.push(s);
             }
         }
 
@@ -351,29 +350,34 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
     Ok(())
 }
 
-/// Return the line in record corresponding to the last buried file still in
-/// the graveyard
+/// Return the path in the graveyard of the last file buried by the user
 fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
     let record = record.as_ref();
+    let mut graves_to_exhume: &mut Vec<String> = &mut Vec::new();
     let mut f = fs::File::open(record)?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
 
-    for line in contents.lines().rev().map(String::from) {
-        let entry = record_entry(&line);
-        // Only unbury files buried by the same user
-        if entry.user != get_user() { continue }
-
+    // This could be cleaned up more if/when for loops can return a value
+    for entry in contents.lines().rev()
+        .map(record_entry)
+        .filter(|x| x.user != get_user()) {
         // Check that the file is still in the graveyard.
         // If it is, return the corresponding line.
         if symlink_exists(entry.dest) {
-            return Ok(line.clone())
+            if !graves_to_exhume.is_empty() {
+                delete_lines_from_record(&f, record, &graves_to_exhume)?;
+            }
+            return Ok(String::from(entry.dest))
         } else {
-            // File was moved, remove the line from record
-            delete_lines_from_record(&f, record, &[line.clone()])?;
+            // File is gone, mark the grave to be removed from the record
+            graves_to_exhume.push(String::from(entry.dest));
         }
     }
 
+    if !graves_to_exhume.is_empty() {
+        delete_lines_from_record(&f, record, &graves_to_exhume)?;
+    }
     Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
 }
 
