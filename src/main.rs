@@ -415,7 +415,7 @@ fn delete_lines_from_record<R: AsRef<Path>>(record: R, graves: &[String])
     };
     let mut f = fs::File::create(record)?;
     for line in lines_to_write {
-        writeln!(f, "{}", line).unwrap();
+        writeln!(f, "{}", line)?;
     }
 
     Ok(())
