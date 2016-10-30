@@ -122,27 +122,26 @@ Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
         }
 
         // Go through the graveyard and exhume all the graves
-        if let Ok(lines) = lines_of_graves(record, &graves_to_exhume) {
-            for line in lines {
-                let entry = record_entry(&line);
-                let orig: &Path = &{
-                    if symlink_exists(entry.orig) {
-                        rename_grave(entry.orig)
-                    } else {
-                        PathBuf::from(entry.orig)
-                    }
-                };
-                if let Err(e) = bury(entry.dest, orig) {
-                    println!("ERROR: {}: {}", e, entry.dest);
+        let f = &fs::File::open(record).unwrap();
+        for line in lines_of_graves(f, &graves_to_exhume) {
+            let entry = record_entry(&line);
+            let orig: &Path = &{
+                if symlink_exists(entry.orig) {
+                    rename_grave(entry.orig)
                 } else {
-                    println!("Returned {} to {}", entry.dest, orig.display());
+                    PathBuf::from(entry.orig)
                 }
-            }
-            // Go through the record and remove all the exhumed graves
-            if let Err(e) = delete_lines_from_record(record, &graves_to_exhume) {
-                println!("Failed to delete unburys from grave record: {}", e)
             };
+            if let Err(e) = bury(entry.dest, orig) {
+                println!("ERROR: {}: {}", e, entry.dest);
+            } else {
+                println!("Returned {} to {}", entry.dest, orig.display());
+            }
         }
+        // Go through the record and remove all the exhumed graves
+        if let Err(e) = delete_lines_from_record(f, record, &graves_to_exhume) {
+            println!("Failed to delete unburys from grave record: {}", e)
+        };
         return;
     }
 
@@ -371,7 +370,7 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
             return Ok(line.clone())
         } else {
             // File was moved, remove the line from record
-            delete_lines_from_record(record, &[line.clone()])?;
+            delete_lines_from_record(&f, record, &[line.clone()])?;
         }
     }
 
@@ -388,31 +387,28 @@ fn record_entry(line: &str) -> RecordItem {
 }
 
 /// Takes a vector of grave paths and returns the respective lines in the record
-fn lines_of_graves<R: AsRef<Path>>(record: R, graves: &[String])
-                                       -> io::Result<Vec<String>> {
-    let record = record.as_ref();
-    let f = fs::File::open(record)?;
-    Ok(BufReader::new(f)
-       .lines()
-       .filter_map(|l| l.ok())
-       .filter(|l| graves.into_iter().any(|y| y == record_entry(l).dest))
-       .collect())
+fn lines_of_graves(f: &fs::File, graves: &[String]) -> Vec<String> {
+    BufReader::new(f)
+        .lines()
+        .filter_map(|l| l.ok())
+        .filter(|l| graves.into_iter().any(|y| y == record_entry(l).dest))
+        .collect()
 }
 
 /// Takes a vector of grave paths and removes the respective lines from the record
-fn delete_lines_from_record<R: AsRef<Path>>(record: R, graves: &[String])
+fn delete_lines_from_record<R: AsRef<Path>>(f: &fs::File,
+                                            record: R,
+                                            graves: &[String])
                                             -> io::Result<()> {
     let record = record.as_ref();
-    // Get the lines to write back to record, which is every line except
-    // the ones matching the exhumed graves
-    let lines_to_write: Vec<String> = {
-        let f = fs::File::open(record)?;
-        BufReader::new(f)
-            .lines()
-            .filter_map(|l| l.ok())
-            .filter(|l| !graves.into_iter().any(|y| y == record_entry(l).dest))
-            .collect()
-    };
+    // Get the lines to write back to the record, which is every line except
+    // the ones matching the exhumed graves.  Store them in a vector
+    // since we'll be overwriting the record in-place
+    let lines_to_write: Vec<String> = BufReader::new(f)
+        .lines()
+        .filter_map(|l| l.ok())
+        .filter(|l| !graves.into_iter().any(|y| y == record_entry(l).dest))
+        .collect();
     let mut f = fs::File::create(record)?;
     for line in lines_to_write {
         writeln!(f, "{}", line)?;
