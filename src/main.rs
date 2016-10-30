@@ -35,7 +35,7 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Rm ImProved
-Send files to the graveyard (/tmp/.graveyard) instead of unlinking them.")
+Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking them.")
         .arg(Arg::with_name("TARGET")
              .help("File or directory to remove")
              .multiple(true)
