@@ -1,4 +1,5 @@
 // -*- compile-command: "cargo build" -*-
+#![feature(conservative_impl_trait)]
 #![feature(io)]
 #![feature(alloc_system)]
 extern crate alloc_system;
@@ -101,13 +102,8 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
         // the graves_to_exhume.
         if matches.is_present("seance") {
             if let Ok(f) = fs::File::open(record) {
-                let gravepath = graveyard.join(cwd.strip_prefix("/").unwrap());
-                let seanced = BufReader::new(f)
-                    .lines()
-                    .filter_map(|l| l.ok())
-                    .map(|l| record_entry(&l).dest.to_string())
-                    .filter(|d| d.starts_with(gravepath.to_str().unwrap()));
-                for grave in seanced {
+                let gravepath = &graveyard.join(cwd.strip_prefix("/").unwrap());
+                for grave in seance(f, gravepath) {
                     graves_to_exhume.push(grave);
                 }
             }
@@ -139,22 +135,18 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
         }
         // Go through the record and remove all the exhumed graves
         if let Err(e) = delete_lines_from_record(f, record, graves_to_exhume) {
-            println!("Failed to delete unburys from grave record: {}", e)
+            println!("Failed to remove unburied files from record: {}", e);
         };
         return;
     }
 
     if matches.is_present("seance") {
         // Can't join absolute paths, so we need to strip the leading "/"
-        let path = graveyard.join(cwd.strip_prefix("/").unwrap());
+        let gravepath = &graveyard.join(cwd.strip_prefix("/").unwrap());
         if let Ok(f) = fs::File::open(record) {
-            for line in BufReader::new(f)
-                .lines()
-                .filter_map(|l| l.ok())
-                .map(|l| record_entry(&l).dest.to_string())
-                .filter(|l| l.starts_with(path.to_str().unwrap())) {
-                    println!("{}", line);
-                }
+            for grave in seance(f, gravepath) {
+                println!("{}", grave);
+            }
         }
         return;
     }
@@ -262,8 +254,7 @@ fn write_log<S, D, R>(source: S, dest: D, record: R) -> io::Result<()>
     Ok(())
 }
 
-fn bury<S, D>(source: S, dest: D) -> io::Result<()>
-    where S: AsRef<Path>, D: AsRef<Path> {
+fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
@@ -287,11 +278,12 @@ fn bury<S, D>(source: S, dest: D) -> io::Result<()>
                 if let Err(e) = fs::DirBuilder::new()
                     .mode(mode)
                     .create(dest.join(orphan)) {
-                    println!("Failed to create {} in {}",
-                             entry.path().display(),
-                             dest.join(orphan).display());
-                    fs::remove_dir_all(dest)?;
-                    return Err(e);
+                        println!("Failed to create {} in {}",
+                                 entry.path().display(),
+                                 dest.join(orphan).display());
+                        // Clean up a partial copy
+                        fs::remove_dir_all(dest)?;
+                        return Err(e);
                 }
             } else {
                 copy_file(entry.path(), dest.join(orphan))?;
@@ -306,8 +298,7 @@ fn bury<S, D>(source: S, dest: D) -> io::Result<()>
     Ok(())
 }
 
-fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
-    where S: AsRef<Path>, D: AsRef<Path> {
+fn copy_file<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
     let metadata = fs::symlink_metadata(source)?;
     let filetype = metadata.file_type();
@@ -322,8 +313,7 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
 
     if filetype.is_file() {
         if let Err(e) = fs::copy(source, dest) {
-            println!("Failed to copy {} to {}",
-                     source.display(), dest.display());
+            println!("Failed to copy {} to {}", source.display(), dest.display());
             return Err(e)
         }
     } else if filetype.is_fifo() {
@@ -350,7 +340,9 @@ fn copy_file<S, D>(source: S, dest: D) -> io::Result<()>
     Ok(())
 }
 
-/// Return the path in the graveyard of the last file buried by the user
+/// Return the path in the graveyard of the last file buried by the user.
+/// As a side effect, any valid last files that are found in the record but
+/// not on the filesystem are removed from the record.
 fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
     let record = record.as_ref();
     let graves_to_exhume: &mut Vec<String> = &mut Vec::new();
@@ -397,6 +389,15 @@ fn lines_of_graves(f: &fs::File, graves: &[String]) -> Vec<String> {
         .filter_map(|l| l.ok())
         .filter(|l| graves.into_iter().any(|y| y == record_entry(l).dest))
         .collect()
+}
+
+/// Returns an iterator over all graves in the record that are under gravepath
+fn seance<'a>(f: fs::File, gravepath: &'a Path) -> impl Iterator<Item=String> {
+    BufReader::new(f)
+        .lines()
+        .filter_map(|l| l.ok())
+        .map(|l| record_entry(&l).dest.to_string())
+        .filter(move |d| d.starts_with(gravepath.to_str().unwrap()))
 }
 
 /// Takes a vector of grave paths and removes the respective lines from the record
