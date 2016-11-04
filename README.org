@@ -4,7 +4,7 @@
 
 =rip= is a command-line deletion tool focused on safety, ergonomics, and performance.  It favors a simple interface, and does /not/ implement the xdg-trash spec or attempt to achieve the same goals.
 
-Deleted files get sent to the graveyard (=/tmp/.graveyard= by default, see [[https://github.com/nivekuil/rip#-notes][notes]] on changing this) under their absolute path, giving you a chance to recover them.  No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
+Deleted files get sent to the graveyard (=/tmp/graveyard-$USER= by default, see [[https://github.com/nivekuil/rip#-notes][notes]] on changing this) under their absolute path, giving you a chance to recover them.  No data is overwritten.  If files that share the same path are deleted, they will be renamed as numbered backups.
 
 =rip= is made for lazy people.  If any part of the interface could be more intuitive, please open an issue or pull request.
 
