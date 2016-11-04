@@ -67,16 +67,14 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
              .long("inspect"))
         .get_matches();
 
-    let graveyard: &Path = &PathBuf::from(
-        match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
-            (Some(flag), _) => flag.to_string(),
-            (_, Ok(env)) => env,
-            _ => GRAVEYARD.to_string(),
-        }
-    );
+    let graveyard = &match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
+        (Some(flag), _) => PathBuf::from(flag),
+        (_, Ok(env)) => PathBuf::from(env),
+        _ => PathBuf::from(GRAVEYARD)
+    };
 
     if matches.is_present("decompose") {
-        if prompt_yes("Really unlink the entire graveyard?"){
+        if prompt_yes("Really unlink the entire graveyard?") {
             if let Err(e) = fs::remove_dir_all(graveyard) {
                 println!("ERROR: {}", e);
             }
@@ -117,27 +115,28 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
         }
 
         // Go through the graveyard and exhume all the graves
-        let f = &fs::File::open(record).unwrap();
-        for line in lines_of_graves(f, graves_to_exhume) {
-            let entry = record_entry(&line);
-            let orig: &Path = &{
-                if symlink_exists(entry.orig) {
-                    rename_grave(entry.orig)
+        if let Ok(f) = fs::File::open(record) {
+            for line in lines_of_graves(&f, graves_to_exhume) {
+                let entry: RecordItem = record_entry(&line);
+                let orig: &Path = &{
+                    if symlink_exists(entry.orig) {
+                        rename_grave(entry.orig)
+                    } else {
+                        PathBuf::from(entry.orig)
+                    }
+                };
+                if let Err(e) = bury(entry.dest, orig) {
+                    println!("ERROR: {}: {}", e, entry.dest);
                 } else {
-                    PathBuf::from(entry.orig)
+                    println!("Returned {} to {}", entry.dest, orig.display());
                 }
-            };
-            if let Err(e) = bury(entry.dest, orig) {
-                println!("ERROR: {}: {}", e, entry.dest);
-            } else {
-                println!("Returned {} to {}", entry.dest, orig.display());
             }
+            // Go through the record and remove all the exhumed graves
+            if let Err(e) = delete_lines_from_record(f, record, graves_to_exhume) {
+                println!("Failed to remove unburied files from record: {}", e);
+            };
         }
-        // Go through the record and remove all the exhumed graves
-        if let Err(e) = delete_lines_from_record(f, record, graves_to_exhume) {
-            println!("Failed to remove unburied files from record: {}", e);
-        };
-        return;
+        return
     }
 
     if matches.is_present("seance") {
@@ -264,7 +263,7 @@ fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
 
     // If that didn't work, then copy and rm.
     // All parent directories are created with open permissions so that
-    // other users can delete things too
+    // other users can rip things into the same graveyard
     let parent = dest.parent().expect("Trying to delete root?");
     fs::DirBuilder::new().mode(0o777).recursive(true).create(parent)?;
 
@@ -346,7 +345,7 @@ fn copy_file<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<(
 fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
     let record = record.as_ref();
     let graves_to_exhume: &mut Vec<String> = &mut Vec::new();
-    let mut f = &fs::File::open(record)?;
+    let mut f = fs::File::open(record)?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
 
@@ -401,14 +400,14 @@ fn seance<'a>(f: fs::File, gravepath: &'a Path) -> impl Iterator<Item=String> {
 }
 
 /// Takes a vector of grave paths and removes the respective lines from the record
-fn delete_lines_from_record<R: AsRef<Path>>(f: &fs::File,
+fn delete_lines_from_record<R: AsRef<Path>>(f: fs::File,
                                             record: R,
                                             graves: &[String])
                                             -> io::Result<()> {
     let record = record.as_ref();
     // Get the lines to write back to the record, which is every line except
     // the ones matching the exhumed graves.  Store them in a vector
-    // since we'll be overwriting the record in-place
+    // since we'll be overwriting the record in-place.
     let lines_to_write: Vec<String> = BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())
