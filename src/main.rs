@@ -271,7 +271,8 @@ fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
         // Walk the source, creating directories and copying files as needed
         for entry in WalkDir::new(source).into_iter().filter_map(|e| e.ok()) {
             // Path without the top-level directory
-            let orphan: &Path = &join_absolute(entry.path(), source);
+            let orphan: &Path = entry.path().strip_prefix(source)
+                .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
             if entry.file_type().is_dir() {
                 let mode = entry.metadata()?.permissions().mode();
                 if let Err(e) = fs::DirBuilder::new()
