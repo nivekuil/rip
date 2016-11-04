@@ -7,7 +7,7 @@ extern crate alloc_system;
 extern crate clap;
 extern crate core;
 extern crate walkdir;
-extern crate libc;
+extern crate time;
 
 use clap::{Arg, App};
 use walkdir::WalkDir;
@@ -16,17 +16,17 @@ use std::fs;
 use std::env;
 use std::io;
 use std::io::{Read, Write, BufRead, BufReader};
-use std::os::unix::fs::{FileTypeExt, OpenOptionsExt, DirBuilderExt, PermissionsExt};
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 include!("util.rs");
 
-const GRAVEYARD: &'static str = "/tmp/.graveyard";
+const GRAVEYARD: &'static str = "/tmp/graveyard";
 const RECORD: &'static str = ".record";
 const LINES_TO_INSPECT: usize = 6;
 const FILES_TO_INSPECT: usize = 6;
 const BIG_FILE_THRESHOLD: u64 = 500000000; // 500 MB
 
 struct RecordItem<'a> {
-    user: &'a str,
+    _time: &'a str,
     orig: &'a str,
     dest: &'a str,
 }
@@ -240,11 +240,11 @@ fn write_log<S, D, R>(source: S, dest: D, record: R) -> io::Result<()>
     where S: AsRef<Path>, D: AsRef<Path>, R: AsRef<Path> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
     let mut f = fs::OpenOptions::new()
-        .mode(0o666)
         .create(true)
         .append(true)
         .open(record)?;
-    writeln!(f, "{}\t{}\t{}", get_user(), source.display(), dest.display())?;
+    writeln!(f, "{}\t{}\t{}", time::now().ctime(),
+             source.display(), dest.display())?;
 
     Ok(())
 }
@@ -365,10 +365,10 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
 /// Parse a line in the record into a `RecordItem`
 fn record_entry(line: &str) -> RecordItem {
     let mut tokens = line.split('\t');
-    let user: &str = tokens.next().expect("Bad format: column A");
+    let time: &str = tokens.next().expect("Bad format: column A");
     let orig: &str = tokens.next().expect("Bad format: column B");
     let dest: &str = tokens.next().expect("Bad format: column C");
-    RecordItem { user: user, orig: orig, dest: dest }
+    RecordItem { _time: time, orig: orig, dest: dest }
 }
 
 /// Takes a vector of grave paths and returns the respective lines in the record
