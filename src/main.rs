@@ -36,7 +36,7 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Rm ImProved
-Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking them.")
+Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinking them.")
         .arg(Arg::with_name("TARGET")
              .help("File or directory to remove")
              .multiple(true)
@@ -70,7 +70,7 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
     let graveyard = &match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
         (Some(flag), _) => PathBuf::from(flag),
         (_, Ok(env)) => PathBuf::from(env),
-        _ => PathBuf::from(GRAVEYARD)
+        _ => PathBuf::from(format!("{}-{}", GRAVEYARD, get_user()))
     };
 
     if matches.is_present("decompose") {
@@ -84,10 +84,6 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
 
     let record: &Path = &graveyard.join(RECORD);
     let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
-    // Disable umask so rip can create a globally writable graveyard
-    unsafe {
-        libc::umask(0);
-    }
 
     if let Some(t) = matches.values_of("unbury") {
         // Vector to hold the grave path of items we want to unbury.
@@ -262,10 +258,8 @@ fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
     }
 
     // If that didn't work, then copy and rm.
-    // All parent directories are created with open permissions so that
-    // other users can rip things into the same graveyard
-    let parent = dest.parent().expect("Trying to delete root?");
-    fs::DirBuilder::new().mode(0o777).recursive(true).create(parent)?;
+    let parent = dest.parent().ok_or(io::Error::last_os_error())?;
+    fs::create_dir_all(parent)?;
 
     if fs::symlink_metadata(source)?.is_dir() {
         // Walk the source, creating directories and copying files as needed
@@ -274,10 +268,7 @@ fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
             let orphan: &Path = entry.path().strip_prefix(source)
                 .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
             if entry.file_type().is_dir() {
-                let mode = entry.metadata()?.permissions().mode();
-                if let Err(e) = fs::DirBuilder::new()
-                    .mode(mode)
-                    .create(dest.join(orphan)) {
+                if let Err(e) = fs::create_dir_all(dest.join(orphan)) {
                         println!("Failed to create {} in {}",
                                  entry.path().display(),
                                  dest.join(orphan).display());
@@ -340,7 +331,7 @@ fn copy_file<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<(
     Ok(())
 }
 
-/// Return the path in the graveyard of the last file buried by the user.
+/// Return the path in the graveyard of the last file to be buried.
 /// As a side effect, any valid last files that are found in the record but
 /// not on the filesystem are removed from the record.
 fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
@@ -351,21 +342,19 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
     f.read_to_string(&mut contents)?;
 
     // This could be cleaned up more if/when for loops can return a value
-    for entry in contents.lines().rev()
-        .map(record_entry)
-        .filter(|x| x.user == get_user()) {
-            // Check that the file is still in the graveyard.
-            // If it is, return the corresponding line.
-            if symlink_exists(entry.dest) {
-                if !graves_to_exhume.is_empty() {
-                    delete_lines_from_record(f, record, graves_to_exhume)?;
-                }
-                return Ok(String::from(entry.dest))
-            } else {
-                // File is gone, mark the grave to be removed from the record
-                graves_to_exhume.push(String::from(entry.dest));
+    for entry in contents.lines().rev().map(record_entry) {
+        // Check that the file is still in the graveyard.
+        // If it is, return the corresponding line.
+        if symlink_exists(entry.dest) {
+            if !graves_to_exhume.is_empty() {
+                delete_lines_from_record(f, record, graves_to_exhume)?;
             }
+            return Ok(String::from(entry.dest))
+        } else {
+            // File is gone, mark the grave to be removed from the record
+            graves_to_exhume.push(String::from(entry.dest));
         }
+    }
 
     if !graves_to_exhume.is_empty() {
         delete_lines_from_record(f, record, graves_to_exhume)?;

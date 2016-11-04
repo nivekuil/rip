@@ -45,7 +45,7 @@ $ rip dir1/ file1
 Undo the last deletion
 #+BEGIN_EXAMPLE
 $ rip -u
-Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1
+Returned /tmp/graveyard-jack/home/jack/file1 to /home/jack/file1
 #+END_EXAMPLE
 Print some info (size and first few lines in a file, total size and first few files in a directory) about the target and then prompt for deletion
 #+BEGIN_EXAMPLE
@@ -58,28 +58,28 @@ Send file1 to the graveyard? (y/n) y
 Print files that were deleted from under the current directory
 #+BEGIN_EXAMPLE
 $ rip -s
-/tmp/.graveyard/home/jack/file1
-/tmp/.graveyard/home/jack/dir1
+/tmp/graveyard-jack/home/jack/file1
+/tmp/graveyard-jack/home/jack/dir1
 #+END_EXAMPLE
 Name conflicts are resolved
 #+BEGIN_EXAMPLE
 $ touch file1
 $ rip file1
 $ rip -s
-/tmp/.graveyard/home/jack/dir1
-/tmp/.graveyard/home/jack/file1
-/tmp/.graveyard/home/jack/file1~1
+/tmp/graveyard-jack/home/jack/dir1
+/tmp/graveyard-jack/home/jack/file1
+/tmp/graveyard-jack/home/jack/file1~1
 #+END_EXAMPLE
 -u also takes the path of a file in the graveyard
 #+BEGIN_EXAMPLE
-$ rip -u /tmp/.graveyard/home/jack/file1
-Returned /tmp/.graveyard/home/jack/file1 to /home/jack/file1
+$ rip -u /tmp/graveyard-jack/home/jack/file1
+Returned /tmp/graveyard-jack/home/jack/file1 to /home/jack/file1
 #+END_EXAMPLE
 Combine -u and -s to restore everything printed by -s
 #+BEGIN_EXAMPLE
 $ rip -su
-Returned /tmp/.graveyard/home/jack/dir1 to /home/jack/dir1
-Returned /tmp/.graveyard/home/jack/file1~1 to /home/jack/file1~1
+Returned /tmp/graveyard-jack/home/jack/dir1 to /home/jack/dir1
+Returned /tmp/graveyard-jack/home/jack/file1~1 to /home/jack/file1~1
 #+END_EXAMPLE
 ** ⚰ Notes
 - You probably shouldn't alias =rm= to =rip=.  Unlearning muscle memory is hard, but it's harder to ensure that every =rm= you make (as different users, from different machines and application environments) is the aliased one.
