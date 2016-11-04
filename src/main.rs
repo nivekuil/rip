@@ -100,7 +100,8 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
         // the graves_to_exhume.
         if matches.is_present("seance") {
             if let Ok(f) = fs::File::open(record) {
-                let gravepath = &graveyard.join(cwd.strip_prefix("/").unwrap());
+                let gravepath = join_absolute(graveyard, cwd).to_string_lossy()
+                    .into_owned();
                 for grave in seance(f, gravepath) {
                     graves_to_exhume.push(grave);
                 }
@@ -140,8 +141,8 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
     }
 
     if matches.is_present("seance") {
-        // Can't join absolute paths, so we need to strip the leading "/"
-        let gravepath = &graveyard.join(cwd.strip_prefix("/").unwrap());
+        let gravepath = join_absolute(graveyard, cwd).to_string_lossy()
+            .into_owned();
         if let Ok(f) = fs::File::open(record) {
             for grave in seance(f, gravepath) {
                 println!("{}", grave);
@@ -216,8 +217,7 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
             }
 
             let dest: &Path = &{
-                // Can't join absolute paths, so strip the leading "/"
-                let dest = graveyard.join(source.strip_prefix("/").unwrap());
+                let dest = join_absolute(graveyard, source);
                 // Resolve a name conflict if necessary
                 if symlink_exists(&dest) {
                     rename_grave(dest)
@@ -271,7 +271,7 @@ fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
         // Walk the source, creating directories and copying files as needed
         for entry in WalkDir::new(source).into_iter().filter_map(|e| e.ok()) {
             // Path without the top-level directory
-            let orphan: &Path = entry.path().strip_prefix(source).unwrap();
+            let orphan: &Path = &join_absolute(entry.path(), source);
             if entry.file_type().is_dir() {
                 let mode = entry.metadata()?.permissions().mode();
                 if let Err(e) = fs::DirBuilder::new()
@@ -391,12 +391,12 @@ fn lines_of_graves(f: &fs::File, graves: &[String]) -> Vec<String> {
 }
 
 /// Returns an iterator over all graves in the record that are under gravepath
-fn seance<'a>(f: fs::File, gravepath: &'a Path) -> impl Iterator<Item=String> {
+fn seance<T: AsRef<str>>(f: fs::File, gravepath: T) -> impl Iterator<Item=String> {
     BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())
         .map(|l| record_entry(&l).dest.to_string())
-        .filter(move |d| d.starts_with(gravepath.to_str().unwrap()))
+        .filter(move |d| d.starts_with(gravepath.as_ref()))
 }
 
 /// Takes a vector of grave paths and removes the respective lines from the record
