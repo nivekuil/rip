@@ -7,8 +7,8 @@ fn get_user() -> String {
 }
 
 /// Prompt for user input, returning True if the first character is 'y' or 'Y'
-fn prompt_yes(prompt: &str) -> bool {
-    print!("{} (y/N) ", prompt);
+fn prompt_yes<T: AsRef<str>>(prompt: T) -> bool {
+    print!("{} (y/N) ", prompt.as_ref());
     io::stdout().flush().unwrap();
     let stdin = BufReader::new(io::stdin());
     if let Some(c) = stdin.chars().next() {

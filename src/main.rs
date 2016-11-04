@@ -191,7 +191,7 @@ Send files to the graveyard (/tmp/.graveyard by default) instead of unlinking th
                             println!("Error reading {}", source.display());
                         }
                     }
-                    if !prompt_yes(&format!("Send {} to the graveyard?", target)) {
+                    if !prompt_yes(format!("Send {} to the graveyard?", target)) {
                         continue;
                     }
                 }
