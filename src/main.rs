@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::env;
 use std::io;
+use std::io::{Seek, SeekFrom};
 use std::io::{Read, Write, BufRead, BufReader};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 include!("util.rs");
@@ -112,7 +113,7 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
         }
 
         // Go through the graveyard and exhume all the graves
-        if let Ok(f) = fs::File::open(record) {
+        if let Ok(mut f) = fs::File::open(record) {
             for line in lines_of_graves(&f, graves_to_exhume) {
                 let entry: RecordItem = record_entry(&line);
                 let orig: &Path = &{
@@ -128,10 +129,13 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                     println!("Returned {} to {}", entry.dest, orig.display());
                 }
             }
+            // Rewind the file for deletion
+            if f.seek(SeekFrom::Start(0)).is_ok() {
             // Go through the record and remove all the exhumed graves
-            if let Err(e) = delete_lines_from_record(f, record, graves_to_exhume) {
-                println!("Failed to remove unburied files from record: {}", e);
-            };
+                if let Err(e) = delete_lines_from_record(f, record, graves_to_exhume) {
+                    println!("Failed to remove unburied files from record: {}", e);
+                };
+            }
         }
         return
     }
