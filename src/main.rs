@@ -153,22 +153,26 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
 
     if let Some(targets) = matches.values_of("TARGET") {
         for target in targets {
-            let source: &Path = &cwd.join(Path::new(target));
-
             // Check if source exists
-            if let Ok(metadata) = source.symlink_metadata() {
+            if let Ok(metadata) = fs::symlink_metadata(target) {
+                // Canonicalize the path unless it's a symlink
+                let source = &if !metadata.file_type().is_symlink() {
+                    cwd.join(target).canonicalize().expect("Failed to canonicalize")
+                } else {
+                    cwd.join(target)
+                };
 
                 if matches.is_present("inspect") {
                     if metadata.is_dir() {
                         // Get the size of the directory and all its contents
                         println!("{}: directory, {} including:", target,
-                                  humanize_bytes(
-                                      WalkDir::new(source)
-                                          .into_iter()
-                                          .filter_map(|x| x.ok())
-                                          .filter_map(|x| x.metadata().ok())
-                                          .map(|x| x.len())
-                                          .sum::<u64>()));
+                                 humanize_bytes(
+                                     WalkDir::new(source)
+                                         .into_iter()
+                                         .filter_map(|x| x.ok())
+                                         .filter_map(|x| x.metadata().ok())
+                                         .map(|x| x.len())
+                                         .sum::<u64>()));
                                  
                         // Print the first few top-level files in the directory
                         for entry in WalkDir::new(source)
@@ -197,41 +201,39 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                     }
                 }
 
+                // If rip is called on a file already in the graveyard, prompt
+                // to permanently delete it instead.
+                if source.starts_with(graveyard) {
+                    println!("{} is already in the graveyard.", source.display());
+                    if prompt_yes("Permanently unlink it?") {
+                        if fs::remove_dir_all(source).is_err() {
+                            if let Err(e) = fs::remove_file(source) {
+                                println!("Couldn't unlink {}:", e);
+                            }
+                        }
+                        continue;
+                    }
+                }
+
+                let dest: &Path = &{
+                    let dest = join_absolute(graveyard, source);
+                    // Resolve a name conflict if necessary
+                    if symlink_exists(&dest) {
+                        rename_grave(dest)
+                    } else {
+                        dest
+                    }
+                };
+
+                if let Err(e) = bury(source, dest) {
+                    println!("ERROR: {}: {}", e, target);
+                    // Clean up any partial buries due to permission error
+                    fs::remove_dir_all(dest).is_ok();
+                } else if let Err(e) = write_log(source, dest, record) {
+                    println!("Error adding {} to record: {}", target, e);
+                }
             } else {
                 println!("Cannot remove {}: no such file or directory", target);
-                return;
-            }
-
-            // If rip is called on a file already in the graveyard, prompt
-            // to permanently delete it instead.
-            if source.starts_with(graveyard) {
-                println!("{} is already in the graveyard.", source.display());
-                if prompt_yes("Permanently unlink it?") {
-                    if fs::remove_dir_all(source).is_err() {
-                        if let Err(e) = fs::remove_file(source) {
-                            println!("Couldn't unlink {}:", e);
-                        }
-                    }
-                    continue;
-                }
-            }
-
-            let dest: &Path = &{
-                let dest = join_absolute(graveyard, source);
-                // Resolve a name conflict if necessary
-                if symlink_exists(&dest) {
-                    rename_grave(dest)
-                } else {
-                    dest
-                }
-            };
-
-            if let Err(e) = bury(source, dest) {
-                println!("ERROR: {}: {}", e, target);
-                // Clean up any partial buries due to permission error
-                fs::remove_dir_all(dest).is_ok();
-            } else if let Err(e) = write_log(source, dest, record) {
-                println!("Error adding {} to record: {}", target, e);
             }
         }
     } else {
@@ -262,7 +264,7 @@ fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
     }
 
     // If that didn't work, then copy and rm.
-    let parent = dest.parent().ok_or(io::Error::last_os_error())?;
+    let parent = dest.parent().ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
     fs::create_dir_all(parent)?;
 
     if fs::symlink_metadata(source)?.is_dir() {
