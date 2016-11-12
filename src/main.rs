@@ -28,8 +28,8 @@ const BIG_FILE_THRESHOLD: u64 = 500000000; // 500 MB
 
 struct RecordItem<'a> {
     _time: &'a str,
-    orig: &'a str,
-    dest: &'a str,
+    orig: &'a Path,
+    dest: &'a Path,
 }
 
 fn main() {
@@ -90,7 +90,7 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
         // This will be used to determine which items to remove from the
         // record following the unbury.
         // Initialize it with the targets passed to -r
-        let graves_to_exhume: &mut Vec<String> = &mut t.map(String::from).collect();
+        let graves_to_exhume: &mut Vec<PathBuf> = &mut t.map(PathBuf::from).collect();
 
         // If -s is also passed, push all files found by seance onto
         // the graves_to_exhume.
@@ -124,9 +124,9 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                     }
                 };
                 if let Err(e) = bury(entry.dest, orig) {
-                    println!("ERROR: {}: {}", e, entry.dest);
+                    println!("ERROR: {}: {}", e, entry.dest.display());
                 } else {
-                    println!("Returned {} to {}", entry.dest, orig.display());
+                    println!("Returned {} to {}", entry.dest.display(), orig.display());
                 }
             }
             // Rewind the file for deletion
@@ -146,7 +146,7 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
             .into_owned();
         if let Ok(f) = fs::File::open(record) {
             for grave in seance(f, gravepath) {
-                println!("{}", grave);
+                println!("{}", grave.display());
             }
         }
         return;
@@ -349,9 +349,9 @@ fn copy_file<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<(
 /// Return the path in the graveyard of the last file to be buried.
 /// As a side effect, any valid last files that are found in the record but
 /// not on the filesystem are removed from the record.
-fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
+fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<PathBuf> {
     let record = record.as_ref();
-    let graves_to_exhume: &mut Vec<String> = &mut Vec::new();
+    let graves_to_exhume: &mut Vec<PathBuf> = &mut Vec::new();
     let mut f = fs::File::open(record)?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
@@ -364,10 +364,10 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<String> {
             if !graves_to_exhume.is_empty() {
                 delete_lines_from_record(f, record, graves_to_exhume)?;
             }
-            return Ok(String::from(entry.dest));
+            return Ok(PathBuf::from(entry.dest));
         } else {
             // File is gone, mark the grave to be removed from the record
-            graves_to_exhume.push(String::from(entry.dest));
+            graves_to_exhume.push(PathBuf::from(entry.dest));
         }
     }
 
@@ -385,13 +385,13 @@ fn record_entry(line: &str) -> RecordItem {
     let dest: &str = tokens.next().expect("Bad format: column C");
     RecordItem {
         _time: time,
-        orig: orig,
-        dest: dest,
+        orig: Path::new(orig),
+        dest: Path::new(dest),
     }
 }
 
 /// Takes a vector of grave paths and returns the respective lines in the record
-fn lines_of_graves(f: &fs::File, graves: &[String]) -> Vec<String> {
+fn lines_of_graves(f: &fs::File, graves: &[PathBuf]) -> Vec<String> {
     BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())
@@ -400,18 +400,18 @@ fn lines_of_graves(f: &fs::File, graves: &[String]) -> Vec<String> {
 }
 
 /// Returns an iterator over all graves in the record that are under gravepath
-fn seance<T: AsRef<str>>(f: fs::File, gravepath: T) -> impl Iterator<Item=String> {
+fn seance<T: AsRef<str>>(f: fs::File, gravepath: T) -> impl Iterator<Item=PathBuf> {
     BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())
-        .map(|l| record_entry(&l).dest.to_string())
+        .map(|l| PathBuf::from(record_entry(&l).dest))
         .filter(move |d| d.starts_with(gravepath.as_ref()))
 }
 
 /// Takes a vector of grave paths and removes the respective lines from the record
 fn delete_lines_from_record<R: AsRef<Path>>(f: fs::File,
                                             record: R,
-                                            graves: &[String])
+                                            graves: &[PathBuf])
                                             -> io::Result<()> {
     let record = record.as_ref();
     // Get the lines to write back to the record, which is every line except
@@ -420,7 +420,8 @@ fn delete_lines_from_record<R: AsRef<Path>>(f: fs::File,
     let lines_to_write: Vec<String> = BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())
-        .filter(|l| !graves.into_iter().any(|y| y == record_entry(l).dest))
+        .filter(|l| !graves.into_iter()
+                .any(|y| y == record_entry(l).dest))
         .collect();
     let mut f = fs::File::create(record)?;
     for line in lines_to_write {
