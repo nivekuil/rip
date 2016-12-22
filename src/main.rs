@@ -8,6 +8,8 @@ extern crate clap;
 extern crate core;
 extern crate walkdir;
 extern crate time;
+#[macro_use]
+extern crate error_chain;
 
 use clap::{Arg, App};
 use walkdir::WalkDir;
@@ -15,9 +17,14 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::env;
 use std::io;
-use std::io::{Seek, SeekFrom};
 use std::io::{Read, Write, BufRead, BufReader};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
+
+mod errors {
+    error_chain!{}
+}
+use errors::*;
+
 include!("util.rs");
 
 const GRAVEYARD: &'static str = "/tmp/graveyard";
@@ -33,6 +40,22 @@ struct RecordItem<'a> {
 }
 
 fn main() {
+    if let Err(e) = run() {
+        println!("Error: {}", e);
+
+        for e in e.iter().skip(1) {
+            println!("Caused by: {}", e);
+        }
+
+        if let Some(backtrace) = e.backtrace() {
+            println!("Backtrace: {:?}", backtrace);
+        }
+
+        ::std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
     let matches = App::new("rip")
         .version(crate_version!())
         .author(crate_authors!())
@@ -75,11 +98,9 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
 
     if matches.is_present("decompose") {
         if prompt_yes("Really unlink the entire graveyard?") {
-            if let Err(e) = fs::remove_dir_all(graveyard) {
-                println!("ERROR: {}", e);
-            }
+            fs::remove_dir_all(graveyard).chain_err(|| "Couldn't unlink graveyard")?;
         }
-        return;
+        return Ok(());
     }
 
     let record: &Path = &graveyard.join(RECORD);
@@ -113,43 +134,39 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
         }
 
         // Go through the graveyard and exhume all the graves
-        if let Ok(mut f) = fs::File::open(record) {
-            for line in lines_of_graves(&f, graves_to_exhume) {
-                let entry: RecordItem = record_entry(&line);
-                let orig: &Path = &{
-                    if symlink_exists(entry.orig) {
-                        rename_grave(entry.orig)
-                    } else {
-                        PathBuf::from(entry.orig)
-                    }
-                };
-                if let Err(e) = bury(entry.dest, orig) {
-                    println!("ERROR: {}: {}", e, entry.dest.display());
+        let f = fs::File::open(record).chain_err(|| "Couldn't read the record")?;
+        for line in lines_of_graves(f, graves_to_exhume) {
+            let entry: RecordItem = record_entry(&line);
+            let orig: &Path = &{
+                if symlink_exists(entry.orig) {
+                    rename_grave(entry.orig)
                 } else {
-                    println!("Returned {} to {}", entry.dest.display(), orig.display());
+                    PathBuf::from(entry.orig)
                 }
-            }
-            // Rewind the file for deletion
-            if f.seek(SeekFrom::Start(0)).is_ok() {
-                // Go through the record and remove all the exhumed graves
-                if let Err(e) = delete_lines_from_record(f, record, graves_to_exhume) {
-                    println!("Failed to remove unburied files from record: {}", e);
-                };
-            }
+            };
+            bury(entry.dest, orig).chain_err(|| {
+                    format!("Unbury failed: couldn't copy files from {} to {}",
+                            entry.dest.display(),
+                            orig.display())
+                })?;
+            println!("Returned {} to {}", entry.dest.display(), orig.display());
         }
-        return;
+
+        // Reopen the record and then delete lines corresponding to exhumed graves
+        if let Err(e) = fs::File::open(record)
+            .and_then(|f| delete_lines_from_record(f, record, graves_to_exhume)) {
+            bail!("Failed to remove unburied files from record: {}", e);
+        }
+        return Ok(());
     }
 
     if matches.is_present("seance") {
-        let gravepath = join_absolute(graveyard, cwd)
-            .to_string_lossy()
-            .into_owned();
-        if let Ok(f) = fs::File::open(record) {
-            for grave in seance(f, gravepath) {
-                println!("{}", grave.display());
-            }
+        let gravepath = join_absolute(graveyard, cwd);
+        let f = fs::File::open(record).chain_err(|| "Failed to read record")?;
+        for grave in seance(f, gravepath.to_string_lossy()) {
+            println!("{}", grave.display());
         }
-        return;
+        return Ok(());
     }
 
     if let Some(targets) = matches.values_of("TARGET") {
@@ -158,7 +175,7 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
             if let Ok(metadata) = fs::symlink_metadata(target) {
                 // Canonicalize the path unless it's a symlink
                 let source = &if !metadata.file_type().is_symlink() {
-                    cwd.join(target).canonicalize().expect("Failed to canonicalize")
+                    cwd.join(target).canonicalize().chain_err(|| "Failed to canonicalize path")?
                 } else {
                     cwd.join(target)
                 };
@@ -209,11 +226,12 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                     println!("{} is already in the graveyard.", source.display());
                     if prompt_yes("Permanently unlink it?") {
                         if fs::remove_dir_all(source).is_err() {
-                            if let Err(e) = fs::remove_file(source) {
-                                println!("Couldn't unlink {}:", e);
-                            }
+                            fs::remove_file(source).chain_err(|| "Couldn't unlink")?;
                         }
                         continue;
+                    } else {
+                        println!("Skipping {}", source.display());
+                        return Ok(());
                     }
                 }
 
@@ -228,19 +246,21 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                 };
 
                 if let Err(e) = bury(source, dest) {
-                    println!("ERROR: {}: {}", e, target);
-                    // Clean up any partial buries due to permission error
+                    println!("Failed to bury file: {}", e);
                     fs::remove_dir_all(dest).is_ok();
-                } else if let Err(e) = write_log(source, dest, record) {
-                    println!("Error adding {} to record: {}", target, e);
                 }
+                // Clean up any partial buries due to permission error
+                write_log(source, dest, record)
+                    .chain_err(|| format!("Failed to write record at {}", record.display()))?;
             } else {
-                println!("Cannot remove {}: no such file or directory", target);
+                bail!("Cannot remove {}: no such file or directory", target);
             }
         }
     } else {
         println!("{}\nrip -h for help", matches.usage());
     }
+    return Ok(());
+
 }
 
 /// Write deletion history to record
@@ -262,7 +282,7 @@ fn write_log<S, D, R>(source: S, dest: D, record: R) -> io::Result<()>
     Ok(())
 }
 
-fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
+fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> Result<()> {
     let (source, dest) = (source.as_ref(), dest.as_ref());
     // Try a simple rename, which will only work within the same mount point.
     // Trying to rename across filesystems will throw errno 18.
@@ -271,33 +291,40 @@ fn bury<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<()> {
     }
 
     // If that didn't work, then copy and rm.
-    let parent = dest.parent().ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-    fs::create_dir_all(parent)?;
+    let parent = dest.parent().ok_or("Couldn't get parent of dest")?;
+    fs::create_dir_all(parent).chain_err(|| "Couldn't create parent dir")?;
 
-    if fs::symlink_metadata(source)?.is_dir() {
+    if fs::symlink_metadata(source).chain_err(|| "Couldn't get metadata")?.is_dir() {
         // Walk the source, creating directories and copying files as needed
         for entry in WalkDir::new(source).into_iter().filter_map(|e| e.ok()) {
             // Path without the top-level directory
             let orphan: &Path = entry.path()
                 .strip_prefix(source)
-                .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+                .chain_err(|| "Parent directory isn't a prefix of child directories?")?;
             if entry.file_type().is_dir() {
-                if let Err(e) = fs::create_dir_all(dest.join(orphan)) {
-                    println!("Failed to create {} in {}",
-                             entry.path().display(),
-                             dest.join(orphan).display());
-                    // Clean up a partial copy
-                    fs::remove_dir_all(dest)?;
-                    return Err(e);
-                }
+                fs::create_dir_all(dest.join(orphan)).chain_err(|| {
+                        format!("Failed to create {} in {}",
+                                entry.path().display(),
+                                dest.join(orphan).display())
+                    })?;
             } else {
-                copy_file(entry.path(), dest.join(orphan))?;
+                copy_file(entry.path(), dest.join(orphan)).chain_err(|| {
+                        format!("Failed to copy file from {} to {}",
+                                entry.path().display(),
+                                dest.join(orphan).display())
+                    })?;
             }
         }
-        fs::remove_dir_all(source)?;
+        fs::remove_dir_all(source)
+            .chain_err(|| format!("Failed to remove dir: {}", source.display()))?;
     } else {
-        copy_file(source, dest)?;
-        fs::remove_file(source)?;
+        copy_file(source, dest).chain_err(|| {
+                format!("Failed to copy file from {} to {}",
+                        source.display(),
+                        dest.display())
+            })?;
+        fs::remove_file(source)
+            .chain_err(|| format!("Failed to remove file: {}", source.display()))?;
     }
 
     Ok(())
@@ -319,7 +346,7 @@ fn copy_file<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<(
 
     if filetype.is_file() {
         if let Err(e) = fs::copy(source, dest) {
-            println!("Failed to copy {} to {}", source.display(), dest.display());
+            // println!("Failed to copy {} to {}", source.display(), dest.display());
             return Err(e);
         }
     } else if filetype.is_fifo() {
@@ -350,9 +377,8 @@ fn copy_file<S: AsRef<Path>, D: AsRef<Path>>(source: S, dest: D) -> io::Result<(
 /// As a side effect, any valid last files that are found in the record but
 /// not on the filesystem are removed from the record.
 fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<PathBuf> {
-    let record = record.as_ref();
     let graves_to_exhume: &mut Vec<PathBuf> = &mut Vec::new();
-    let mut f = fs::File::open(record)?;
+    let mut f = fs::File::open(record.as_ref())?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
 
@@ -374,7 +400,7 @@ fn get_last_bury<R: AsRef<Path>>(record: R) -> io::Result<PathBuf> {
     if !graves_to_exhume.is_empty() {
         delete_lines_from_record(f, record, graves_to_exhume)?;
     }
-    Err(io::Error::new(io::ErrorKind::Other, "But nobody came"))
+    Err(io::Error::new(io::ErrorKind::NotFound, "But nobody came"))
 }
 
 /// Parse a line in the record into a `RecordItem`
@@ -391,16 +417,15 @@ fn record_entry(line: &str) -> RecordItem {
 }
 
 /// Takes a vector of grave paths and returns the respective lines in the record
-fn lines_of_graves(f: &fs::File, graves: &[PathBuf]) -> Vec<String> {
+fn lines_of_graves<'a>(f: fs::File, graves: &'a [PathBuf]) -> impl Iterator<Item = String> {
     BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())
-        .filter(|l| graves.into_iter().any(|y| y == record_entry(l).dest))
-        .collect()
+        .filter(move |l| graves.into_iter().any(|y| y == record_entry(l).dest))
 }
 
 /// Returns an iterator over all graves in the record that are under gravepath
-fn seance<T: AsRef<str>>(f: fs::File, gravepath: T) -> impl Iterator<Item=PathBuf> {
+fn seance<T: AsRef<str>>(f: fs::File, gravepath: T) -> impl Iterator<Item = PathBuf> {
     BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())
@@ -420,8 +445,7 @@ fn delete_lines_from_record<R: AsRef<Path>>(f: fs::File,
     let lines_to_write: Vec<String> = BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())
-        .filter(|l| !graves.into_iter()
-                .any(|y| y == record_entry(l).dest))
+        .filter(|l| !graves.into_iter().any(|y| y == record_entry(l).dest))
         .collect();
     let mut f = fs::File::create(record)?;
     for line in lines_to_write {
