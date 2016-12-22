@@ -1,6 +1,6 @@
 [package]
 name = "rm-improved"
-version = "0.11.1"
+version = "0.11.2"
 authors = ["mail@nivekuil.com"]
 description = "rip: a safe and ergonomic alternative to rm"
 repository = "https://github.com/nivekuil/rip"
@@ -14,6 +14,7 @@ include = [
 clap = "2"
 walkdir = "0.1"
 time = "0.1"
+error-chain = "0.7"
 
 [profile.release]
 lto = true
