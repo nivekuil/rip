@@ -26,12 +26,10 @@ fn prompt_yes<T: AsRef<str>>(prompt: T) -> bool {
         println!("{} (y/N)", prompt.as_ref());
     }
     let stdin = BufReader::new(io::stdin());
-    if let Some(c) = stdin.chars().next() {
-        if let Ok(c) = c {
-            return c == 'y' || c == 'Y';
-        }
-    }
-    false
+    stdin.chars().next()
+        .and_then(|c| c.ok())
+        .and_then(|c| Some(c == 'y' || c == 'Y'))
+        .unwrap_or(false)
 }
 
 /// Add a numbered extension to duplicate filenames to avoid overwriting files.
