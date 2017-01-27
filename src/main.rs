@@ -19,7 +19,7 @@ use std::env;
 use std::io;
 use std::io::{Read, Write, BufRead, BufReader};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
-
+use std::borrow::Cow;
 mod errors {
     error_chain!{}
 }
@@ -40,7 +40,7 @@ struct RecordItem<'a> {
 }
 
 fn main() {
-    if let Err(e) = run() {
+    if let Err(ref e) = run() {
         println!("Error: {}", e);
 
         for e in e.iter().skip(1) {
@@ -90,10 +90,13 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
             .long("inspect"))
         .get_matches();
 
-    let graveyard = &match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
-        (Some(flag), _) => PathBuf::from(flag),
-        (_, Ok(env)) => PathBuf::from(env),
-        _ => PathBuf::from(format!("{}-{}", GRAVEYARD, get_user())),
+    let graveyard = &{
+        let graveyard: Cow<str> = match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
+            (Some(flag), _) => flag.into(),
+            (_, Ok(env)) => env.into(),
+            _ => format!("{}-{}", GRAVEYARD, get_user()).into()
+        };
+        PathBuf::from(&*graveyard)
     };
 
     if matches.is_present("decompose") {
@@ -259,8 +262,8 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
     } else {
         println!("{}\nrip -h for help", matches.usage());
     }
-    return Ok(());
 
+    Ok(())
 }
 
 /// Write deletion history to record
