@@ -6,17 +6,15 @@ extern crate alloc_system;
 #[macro_use]
 extern crate clap;
 extern crate core;
-extern crate walkdir;
-extern crate time;
 #[macro_use]
 extern crate error_chain;
+extern crate time;
+extern crate walkdir;
 
 use clap::{Arg, App};
 use walkdir::WalkDir;
+use std::{env, fs, io};
 use std::path::{Path, PathBuf};
-use std::fs;
-use std::env;
-use std::io;
 use std::io::{Read, Write, BufRead, BufReader};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::borrow::Cow;
@@ -41,7 +39,6 @@ struct RecordItem<'a> {
 
 fn main() {
     if let Err(ref e) = run() {
-        use ::std::io::Write;
         let stderr = &mut ::std::io::stderr();
         let errmsg = "Error writing to stderr";
 
@@ -51,8 +48,6 @@ fn main() {
             writeln!(stderr, "caused by: {}", e).expect(errmsg);
         }
 
-        // The backtrace is not always generated. Try to run this example
-        // with `RUST_BACKTRACE=1`.
         if let Some(backtrace) = e.backtrace() {
             writeln!(stderr, "backtrace: {:?}", backtrace).expect(errmsg);
         }
@@ -99,7 +94,7 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
     let _graveyard: Cow<str> = match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
         (Some(flag), _) => flag.into(),
         (_, Ok(env)) => env.into(),
-        _ => format!("{}-{}", GRAVEYARD, get_user()).into()
+        _ => format!("{}-{}", GRAVEYARD, get_user()).into(),
     };
     let graveyard = Path::new(&*_graveyard);
 
@@ -111,7 +106,7 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
     }
 
     let record: &Path = &graveyard.join(RECORD);
-    let cwd: PathBuf = env::current_dir().expect("Failed to get current dir");
+    let cwd: PathBuf = env::current_dir().chain_err(|| "Failed to get current dir")?;
 
     if let Some(t) = matches.values_of("unbury") {
         // Vector to hold the grave path of items we want to unbury.
@@ -253,9 +248,10 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                 };
 
                 bury(source, dest).or_else(|e| {
-                    fs::remove_dir_all(dest).is_ok();
-                    Err(e)
-                }).chain_err(|| "Failed to bury file")?;
+                        fs::remove_dir_all(dest).is_ok();
+                        Err(e)
+                    })
+                    .chain_err(|| "Failed to bury file")?;
                 // Clean up any partial buries due to permission error
                 write_log(source, dest, record)
                     .chain_err(|| format!("Failed to write record at {}", record.display()))?;
