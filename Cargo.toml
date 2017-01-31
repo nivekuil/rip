@@ -9,12 +9,13 @@ include = [
     "**/*.rs",
     "Cargo.toml",
 ]
+categories = ["command-line-utilities"]
 
 [dependencies]
 clap = "2"
-walkdir = "0.1"
+walkdir = "1"
 time = "0.1"
-error-chain = "0.7"
+error-chain = "0.8"
 
 [profile.release]
 lto = true
