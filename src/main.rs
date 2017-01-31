@@ -96,14 +96,12 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
             .long("inspect"))
         .get_matches();
 
-    let graveyard = &{
-        let graveyard: Cow<str> = match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
-            (Some(flag), _) => flag.into(),
-            (_, Ok(env)) => env.into(),
-            _ => format!("{}-{}", GRAVEYARD, get_user()).into()
-        };
-        PathBuf::from(&*graveyard)
+    let _graveyard: Cow<str> = match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
+        (Some(flag), _) => flag.into(),
+        (_, Ok(env)) => env.into(),
+        _ => format!("{}-{}", GRAVEYARD, get_user()).into()
     };
+    let graveyard = Path::new(&*_graveyard);
 
     if matches.is_present("decompose") {
         if prompt_yes("Really unlink the entire graveyard?") {
@@ -254,10 +252,10 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                     }
                 };
 
-                if let Err(e) = bury(source, dest) {
-                    println!("Failed to bury file: {}", e);
+                bury(source, dest).or_else(|e| {
                     fs::remove_dir_all(dest).is_ok();
-                }
+                    Err(e)
+                }).chain_err(|| "Failed to bury file")?;
                 // Clean up any partial buries due to permission error
                 write_log(source, dest, record)
                     .chain_err(|| format!("Failed to write record at {}", record.display()))?;
