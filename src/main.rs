@@ -69,6 +69,7 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
         .arg(Arg::with_name("graveyard")
             .help("Directory where deleted files go to rest")
             .long("graveyard")
+            .short("g")
             .takes_value(true))
         .arg(Arg::with_name("decompose")
             .help("Permanently deletes (unlink) the entire graveyard")
