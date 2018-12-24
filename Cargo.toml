@@ -11,15 +11,16 @@ include = [
     "Cargo.toml",
 ]
 categories = ["command-line-utilities"]
+autobins = false
 
 [dependencies]
 clap = "2"
 walkdir = "1"
 time = "0.1"
-error-chain = "0.8"
+error-chain = "0.12"
 
 [profile.release]
-lto = true
+opt-level = "s"
 
 [[bin]]
 name = "rip"
