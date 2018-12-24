@@ -26,8 +26,9 @@ fn prompt_yes<T: AsRef<str>>(prompt: T) -> bool {
         println!("{} (y/N)", prompt.as_ref());
     }
     let stdin = BufReader::new(io::stdin());
-    stdin.chars().next()
+    stdin.bytes().next()
         .and_then(|c| c.ok())
+        .map(|c| c as char)
         .and_then(|c| Some(c == 'y' || c == 'Y'))
         .unwrap_or(false)
 }

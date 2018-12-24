@@ -1,8 +1,4 @@
 // -*- compile-command: "cargo build" -*-
-#![feature(conservative_impl_trait)]
-#![feature(io)]
-#![feature(alloc_system)]
-extern crate alloc_system;
 #[macro_use]
 extern crate clap;
 extern crate core;
@@ -420,7 +416,7 @@ fn record_entry(line: &str) -> RecordItem {
 }
 
 /// Takes a vector of grave paths and returns the respective lines in the record
-fn lines_of_graves<'a>(f: fs::File, graves: &'a [PathBuf]) -> impl Iterator<Item = String> {
+fn lines_of_graves<'a>(f: fs::File, graves: &'a [PathBuf]) -> impl Iterator<Item = String> + 'a {
     BufReader::new(f)
         .lines()
         .filter_map(|l| l.ok())

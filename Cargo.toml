@@ -4,6 +4,7 @@ version = "0.11.4"
 authors = ["mail@nivekuil.com"]
 description = "rip: a safe and ergonomic alternative to rm"
 repository = "https://github.com/nivekuil/rip"
+readme = "README.org"
 license = "GPL-3.0+"
 include = [
     "**/*.rs",
