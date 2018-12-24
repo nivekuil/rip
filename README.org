@@ -15,7 +15,7 @@ $ tar xvzf rip-*.tar.gz
 $ mv rip /usr/local/bin
 #+END_EXAMPLE
 
-or build it with a nightly rustc:
+or build it:
 #+BEGIN_EXAMPLE
 $ cargo install rm-improved
 #+END_EXAMPLE
