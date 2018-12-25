@@ -24,3 +24,4 @@ opt-level = "s"
 
 [[bin]]
 name = "rip"
+path = "src/main.rs"
