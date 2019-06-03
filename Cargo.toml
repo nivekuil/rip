@@ -1,4 +1,5 @@
 [package]
+edition = '2018'
 name = "rm-improved"
 version = "0.12.0"
 authors = ["mail@nivekuil.com"]
