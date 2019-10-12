@@ -87,9 +87,15 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
             .long("inspect"))
         .get_matches();
 
-    let _graveyard: Cow<str> = match (matches.value_of("graveyard"), env::var("GRAVEYARD")) {
-        (Some(flag), _) => flag.into(),
-        (_, Ok(env)) => env.into(),
+    let _graveyard_opts = { 
+        (matches.value_of("graveyard"),
+         env::var("GRAVEYARD"),
+         env::var("XDG_DATA_HOME"))
+    };
+    let _graveyard: Cow<str> = match _graveyard_opts {
+        (Some(flag), _, _) => flag.into(),
+        (_, Ok(env), _) => env.into(),
+        (_, _, Ok(env)) => format!("{}{}", env, GRAVEYARD).into(),
         _ => format!("{}-{}", GRAVEYARD, get_user()).into(),
     };
     let graveyard = Path::new(&*_graveyard);
