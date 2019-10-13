@@ -9,11 +9,6 @@ Deleted files get sent to the graveyard (=/tmp/graveyard-$USER= by default, see 
 =rip= is made for lazy people.  If any part of the interface could be more intuitive, please open an issue or pull request.
 
 ** ⚰ Installation
-If you use Arch Linux, rip is on the aur:
-#+BEGIN_EXAMPLE
-$ yay -S rm-improved
-#+END_EXAMPLE
-
 Or get a binary [[https://github.com/nivekuil/rip/releases][release]] (Linux x86_64, ARMv7 and macOS), untar it, and move it somewhere on your $PATH:
 #+BEGIN_EXAMPLE
 $ tar xvzf rip-*.tar.gz
