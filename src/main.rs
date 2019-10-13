@@ -95,7 +95,13 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
     let _graveyard: Cow<str> = match _graveyard_opts {
         (Some(flag), _, _) => flag.into(),
         (_, Ok(env), _) => env.into(),
-        (_, _, Ok(env)) => format!("{}{}", env, GRAVEYARD).into(),
+        (_, _, Ok(mut env)) => {
+            if !env.ends_with(std::path::MAIN_SEPARATOR) {
+                env.push(std::path::MAIN_SEPARATOR);
+            }
+            env.push_str("graveyard");
+            env.into()
+        },
         _ => format!("{}-{}", GRAVEYARD, get_user()).into(),
     };
     let graveyard = Path::new(&*_graveyard);
