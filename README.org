@@ -88,6 +88,7 @@ Returned /tmp/graveyard-jack/home/jack/file1~1 to /home/jack/file1~1
 #+END_EXAMPLE
 ** ⚰ Notes
 - You probably shouldn't alias =rm= to =rip=.  Unlearning muscle memory is hard, but it's harder to ensure that every =rm= you make (as different users, from different machines and application environments) is the aliased one.
+- If you have =$XDG_DATA_HOME= environment variable set, =rip= will use =$XDG_DATA_HOME/graveyard= instead of the =/tmp/graveyard-$USER=.
 - If you want to put the graveyard somewhere else (like =~/.local/share/Trash=), you have two options, in order of precedence:
   1. Alias =rip= to =rip --graveyard ~/.local/share/Trash=
   2. Set the environment variable =$GRAVEYARD= to =~/.local/share/Trash=.
