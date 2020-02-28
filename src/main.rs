@@ -277,9 +277,7 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
 
                 bury(source, dest)
                     .or_else(|e| {
-                        fs::remove_dir_all(dest).chain_err(|| {
-                            format!("Failed to move {} to {}", source.display(), dest.display())
-                        })?;
+                        fs::remove_dir_all(dest).ok();
                         Err(e)
                     })
                     .chain_err(|| "Failed to bury file")?;
