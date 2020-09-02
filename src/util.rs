@@ -15,7 +15,7 @@ fn symlink_exists<P: AsRef<Path>>(path: P) -> bool {
 }
 
 fn get_user() -> String {
-    env::var("USER").unwrap_or(String::from("unknown"))
+    env::var("USER").unwrap_or_else(|_| String::from("unknown"))
 }
 
 /// Prompt for user input, returning True if the first character is 'y' or 'Y'
@@ -29,7 +29,7 @@ fn prompt_yes<T: AsRef<str>>(prompt: T) -> bool {
     stdin.bytes().next()
         .and_then(|c| c.ok())
         .map(|c| c as char)
-        .and_then(|c| Some(c == 'y' || c == 'Y'))
+        .map(|c| (c == 'y' || c == 'Y'))
         .unwrap_or(false)
 }
 
@@ -39,8 +39,7 @@ fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
     let name = grave.to_str().expect("Filename must be valid unicode.");
     (1_u64..)
         .map(|i| PathBuf::from(format!("{}~{}", name, i)))
-        .skip_while(|p| symlink_exists(p))
-        .next()
+        .find(|p| !symlink_exists(p))
         .expect("Failed to rename duplicate file or directory")
 }
 

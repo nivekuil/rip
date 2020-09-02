@@ -20,8 +20,8 @@ use errors::*;
 
 include!("util.rs");
 
-const GRAVEYARD: &'static str = "/tmp/graveyard";
-const RECORD: &'static str = ".record";
+const GRAVEYARD: &str = "/tmp/graveyard";
+const RECORD: &str = ".record";
 const LINES_TO_INSPECT: usize = 6;
 const FILES_TO_INSPECT: usize = 6;
 const BIG_FILE_THRESHOLD: u64 = 500000000; // 500 MB
