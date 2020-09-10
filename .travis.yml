@@ -5,18 +5,15 @@ env:
   global:
     - PROJECT_NAME=rip
 
-matrix:
+jobs:
   include:
     - os: linux
       env: TARGET=x86_64-unknown-linux-gnu
       dist: trusty
-      sudo: required
     - os: osx
       env: TARGET=x86_64-apple-darwin
-      sudo: required
     - os: linux
       env: TARGET=armv7-unknown-linux-gnueabihf
-      sudo: required
       addons:
         apt:
           packages:
@@ -39,7 +36,7 @@ before_deploy: bash ci/before_deploy.sh
 
 deploy:
   provider: releases
-  api_key:
+  token:
     secure: "RZj8Xu8ytLCWaFPm2xgodd27d8pGRhZM9EN8u3iGxFNWejnN7HZgaZvxlRgxa58nVqeEXIeQtMVclVmB9MT1Mgll5+L4VfMsnapAgYtHPp7RpRyNlrrlUl4pdLKgwsSiwfqMJAvkCNvpUPVWmM75d70P/d/8p8LYCTgaIm7LBjzIlzRYvxQzGTZ2rufdRyqIyVKCD3R780n/xpeGq8NLXcNj3jZSwqjWeguVU598hfO/ZxwbURnLHjOyXeRIRs380oeHTiuYOzLmPbk31XMT3isthkYDUyBbEES0ruWX2m/114gyt4xtR6OP/JruR1e5bHdCL+kzECZJGKXvPUMAOP35HlxWzuDwZCpthBoBQl6VBc4sCkbj/tV1DhuVrwuoLZT7wYbOC8C06txq1+1TeOB6QFqfLsedIN2/KmUOH2w73l/kwOjMIEDAX3zdy5AFQxefrz6v6bqIAFmNl7Z2eFxT0GNM0yCx96R6yv2YLhZyFe7N/VuTDTGWBMe6CD8OVPez6DTd78kgbMBnXRgWfvMaNMI7Tj3FcvrjG2wHzQtz67HahcB667SLlNvB0Zo0AcI9/YqwhwF2kA/3Tz5084/lrusbyzYDDw57y4LE8J1gbzCC4bKp/21PIv0lIoLj1v3oh14DmfkpWCOo8WISien508I0zMUmiT/FK14ftSQ="
   file_glob: true
   file: ${PROJECT_NAME}-${TRAVIS_TAG}-${TARGET}.*
