@@ -17,8 +17,6 @@ install_c_toolchain() {
 }
 
 install_rustup() {
-    rustc -V
-
     curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain=nightly
 
     rustc -V
