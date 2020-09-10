@@ -1,4 +1,4 @@
-language: rust
+language: generic
 cache: cargo
 
 env:
@@ -8,16 +8,13 @@ env:
 matrix:
   include:
     - os: linux
-      rust: nightly
       env: TARGET=x86_64-unknown-linux-gnu
       dist: trusty
       sudo: required
     - os: osx
-      rust: nightly
       env: TARGET=x86_64-apple-darwin
       sudo: required
     - os: linux
-      rust: nightly
       env: TARGET=armv7-unknown-linux-gnueabihf
       sudo: required
       addons:
@@ -48,7 +45,6 @@ deploy:
   file: ${PROJECT_NAME}-${TRAVIS_TAG}-${TARGET}.*
   skip_cleanup: true
   on:
-    condition: $TRAVIS_RUST_VERSION = nightly
     tags: true
 
 notifications:
