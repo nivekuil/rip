@@ -24,6 +24,13 @@ Deleted files get sent to the graveyard (=/tmp/graveyard-$USER= by default, see 
    #+BEGIN_EXAMPLE
    $ yay -S rm-improved
    #+END_EXAMPLE
+   
+   macOS users can install it with Homebrew:
+
+   #+BEGIN_EXAMPLE
+   $ brew install rm-improved
+   #+END_EXAMPLE
+
 ** ⚰ Usage
    #+BEGIN_EXAMPLE
    USAGE:
