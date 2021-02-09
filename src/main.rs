@@ -242,8 +242,7 @@ fn run() -> Result<()> {
                 bail!("Cannot remove {}: no such file or directory", target);
             }
         }
-    } else {
-        println!("{}\nrip -h for help", matches.usage());
+    }
 
     if let Some(matches) = matches.subcommand_matches("completion") {
         let shell = matches.value_of("shell").unwrap();
@@ -271,6 +270,7 @@ fn cli_rip() -> App<'static> {
     App::new("rip")
         .version(crate_version!())
         .author(crate_authors!())
+        .setting(AppSettings::ArgRequiredElseHelp)
         .about(
             "Rm ImProved
 Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinking them.",
