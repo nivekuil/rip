@@ -52,55 +52,7 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let matches = App::new("rip")
-        .version(crate_version!())
-        .author(crate_authors!())
-        .about(
-            "Rm ImProved
-Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinking them.",
-        )
-        .arg(
-            Arg::with_name("TARGET")
-                .help("File or directory to remove")
-                .multiple(true)
-                .index(1),
-        )
-        .arg(
-            Arg::with_name("graveyard")
-                .help("Directory where deleted files go to rest")
-                .long("graveyard")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("decompose")
-                .help("Permanently deletes (unlink) the entire graveyard")
-                .short("d")
-                .long("decompose"),
-        )
-        .arg(
-            Arg::with_name("seance")
-                .help("Prints files that were sent under the current directory")
-                .short("s")
-                .long("seance"),
-        )
-        .arg(
-            Arg::with_name("unbury")
-                .help(
-                    "Undo the last removal by the current user, or specify some file(s) in the \
-                   graveyard.  Combine with -s to restore everything printed by -s.",
-                )
-                .short("u")
-                .long("unbury")
-                .value_name("target")
-                .min_values(0),
-        )
-        .arg(
-            Arg::with_name("inspect")
-                .help("Prints some info about TARGET before prompting for action")
-                .short("i")
-                .long("inspect"),
-        )
-        .get_matches();
+    let matches = cli_rip().get_matches();
 
     let graveyard: &PathBuf = &{
         if let Some(flag) = matches.value_of("graveyard") {
@@ -295,6 +247,51 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
     Ok(())
 }
 
+// cli interface
+fn cli_rip() -> App<'static> {
+    App::new("rip")
+        .version(crate_version!())
+        .author(crate_authors!())
+        .about(
+            "Rm ImProved
+Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinking them.",
+        )
+        .arg(
+        .arg(
+            Arg::new("graveyard")
+                .about("Directory where deleted files go to rest")
+                .long("graveyard")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("decompose")
+                .about("Permanently deletes (unlink) the entire graveyard")
+                .short('d')
+                .long("decompose"),
+        )
+        .arg(
+            Arg::new("seance")
+                .about("Prints files that were sent under the current directory")
+                .short('s')
+                .long("seance"),
+        )
+        .arg(
+            Arg::new("unbury")
+                .about(
+                    "Undo the last removal by the current user, or specify some file(s) in the \
+                   graveyard.  Combine with -s to restore everything printed by -s.",
+                )
+                .short('u')
+                .long("unbury")
+                .value_name("target")
+                .min_values(0),
+        )
+        .arg(
+            Arg::new("inspect")
+                .about("Prints some info about TARGET before prompting for action")
+                .short('i')
+                .long("inspect"),
+        )
 /// Write deletion history to record
 fn write_log<S, D, R>(source: S, dest: D, record: R) -> io::Result<()>
 where
