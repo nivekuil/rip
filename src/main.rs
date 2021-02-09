@@ -7,7 +7,9 @@ extern crate error_chain;
 extern crate time;
 extern crate walkdir;
 
-use clap::{App, Arg};
+use clap::{crate_authors, crate_version, App, AppSettings, Arg};
+use clap_generate::generators::*;
+use clap_generate::{generate, Generator};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::{Path, PathBuf};
@@ -242,6 +244,23 @@ fn run() -> Result<()> {
         }
     } else {
         println!("{}\nrip -h for help", matches.usage());
+
+    if let Some(matches) = matches.subcommand_matches("completion") {
+        let shell = matches.value_of("shell").unwrap();
+
+        let mut app = cli_rip();
+        match shell {
+            "bash" => print_completions::<Bash>(&mut app),
+            "elvish" => print_completions::<Elvish>(&mut app),
+            "fish" => print_completions::<Fish>(&mut app),
+            "powershell" => print_completions::<PowerShell>(&mut app),
+            "zsh" => print_completions::<Zsh>(&mut app),
+            _ => panic!("Unknown generator"),
+        }
+
+        //if matches.is_present("manual") {
+        // TODO: manual
+        //}
     }
 
     Ok(())
@@ -292,6 +311,35 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                 .short('i')
                 .long("inspect"),
         )
+        .subcommand(
+            App::new("completion")
+                .version(crate_version!())
+                .author(crate_authors!())
+                .setting(AppSettings::Hidden)
+                .about("AutoCompletion")
+                .arg(
+                    Arg::new("shell")
+                        .short('s')
+                        .long("shell")
+                        .about("Selects shell")
+                        .required(true)
+                        .takes_value(true)
+                        .possible_values(&["bash", "elvish", "fish", "powershell", "zsh"]),
+                )
+                .arg(
+                    Arg::new("manual")
+                        .short('m')
+                        .long("manual")
+                        .about("Display instructions on how to install autocompletions"),
+                ),
+        )
+}
+
+/// Print completions
+pub fn print_completions<G: Generator>(app: &mut App) {
+    generate::<G, _>(app, app.get_name().to_string(), &mut io::stdout());
+}
+
 /// Write deletion history to record
 fn write_log<S, D, R>(source: S, dest: D, record: R) -> io::Result<()>
 where

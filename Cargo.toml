@@ -15,7 +15,8 @@ categories = ["command-line-utilities"]
 autobins = false
 
 [dependencies]
-clap = "2"
+clap = "3.0.0-beta.2"
+clap_generate = "3.0.0-beta.2"
 walkdir = "1"
 time = "0.1"
 error-chain = "0.12"
