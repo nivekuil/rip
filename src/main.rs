@@ -276,6 +276,13 @@ fn cli_rip() -> App<'static> {
 Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinking them.",
         )
         .arg(
+            Arg::new("TARGET")
+                .about("File or directory to remove")
+                .short('t')
+                .long("target")
+                .takes_value(true)
+                .multiple(true), //.index(1)
+        )
         .arg(
             Arg::new("graveyard")
                 .about("Directory where deleted files go to rest")
