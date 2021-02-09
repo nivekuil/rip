@@ -1,5 +1,4 @@
 // -*- compile-command: "cargo build" -*-
-#[macro_use]
 extern crate clap;
 extern crate core;
 #[macro_use]
@@ -69,7 +68,9 @@ fn run() -> Result<()> {
             env
         } else {
             format!("{}-{}", GRAVEYARD, get_user())
-        }}.into();
+        }
+    }
+    .into();
 
     if matches.is_present("decompose") {
         if prompt_yes("Really unlink the entire graveyard?") {
