@@ -1,5 +1,4 @@
 // -*- compile-command: "cargo build" -*-
-#[macro_use]
 extern crate clap;
 extern crate core;
 #[macro_use]
@@ -7,7 +6,9 @@ extern crate error_chain;
 extern crate time;
 extern crate walkdir;
 
-use clap::{App, Arg};
+use clap::{crate_authors, crate_version, App, AppSettings, Arg};
+use clap_generate::generators::*;
+use clap_generate::{generate, Generator};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::{Path, PathBuf};
@@ -52,55 +53,7 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let matches = App::new("rip")
-        .version(crate_version!())
-        .author(crate_authors!())
-        .about(
-            "Rm ImProved
-Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinking them.",
-        )
-        .arg(
-            Arg::with_name("TARGET")
-                .help("File or directory to remove")
-                .multiple(true)
-                .index(1),
-        )
-        .arg(
-            Arg::with_name("graveyard")
-                .help("Directory where deleted files go to rest")
-                .long("graveyard")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("decompose")
-                .help("Permanently deletes (unlink) the entire graveyard")
-                .short("d")
-                .long("decompose"),
-        )
-        .arg(
-            Arg::with_name("seance")
-                .help("Prints files that were sent under the current directory")
-                .short("s")
-                .long("seance"),
-        )
-        .arg(
-            Arg::with_name("unbury")
-                .help(
-                    "Undo the last removal by the current user, or specify some file(s) in the \
-                   graveyard.  Combine with -s to restore everything printed by -s.",
-                )
-                .short("u")
-                .long("unbury")
-                .value_name("target")
-                .min_values(0),
-        )
-        .arg(
-            Arg::with_name("inspect")
-                .help("Prints some info about TARGET before prompting for action")
-                .short("i")
-                .long("inspect"),
-        )
-        .get_matches();
+    let matches = cli_rip().get_matches();
 
     let graveyard: &PathBuf = &{
         if let Some(flag) = matches.value_of("graveyard") {
@@ -115,7 +68,9 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
             env
         } else {
             format!("{}-{}", GRAVEYARD, get_user())
-        }}.into();
+        }
+    }
+    .into();
 
     if matches.is_present("decompose") {
         if prompt_yes("Really unlink the entire graveyard?") {
@@ -288,11 +243,109 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                 bail!("Cannot remove {}: no such file or directory", target);
             }
         }
-    } else {
-        println!("{}\nrip -h for help", matches.usage());
+    }
+
+    if let Some(matches) = matches.subcommand_matches("completion") {
+        let shell = matches.value_of("shell").unwrap();
+
+        let mut app = cli_rip();
+        match shell {
+            "bash" => print_completions::<Bash>(&mut app),
+            "elvish" => print_completions::<Elvish>(&mut app),
+            "fish" => print_completions::<Fish>(&mut app),
+            "powershell" => print_completions::<PowerShell>(&mut app),
+            "zsh" => print_completions::<Zsh>(&mut app),
+            _ => panic!("Unknown generator"),
+        }
+
+        //if matches.is_present("manual") {
+        // TODO: manual
+        //}
     }
 
     Ok(())
+}
+
+// cli interface
+fn cli_rip() -> App<'static> {
+    App::new("rip")
+        .version(crate_version!())
+        .author(crate_authors!())
+        .setting(AppSettings::ArgRequiredElseHelp)
+        .about(
+            "Rm ImProved
+Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinking them.",
+        )
+        .arg(
+            Arg::new("TARGET")
+                .about("File or directory to remove")
+                .short('t')
+                .long("target")
+                .takes_value(true)
+                .multiple(true), //.index(1)
+        )
+        .arg(
+            Arg::new("graveyard")
+                .about("Directory where deleted files go to rest")
+                .long("graveyard")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("decompose")
+                .about("Permanently deletes (unlink) the entire graveyard")
+                .short('d')
+                .long("decompose"),
+        )
+        .arg(
+            Arg::new("seance")
+                .about("Prints files that were sent under the current directory")
+                .short('s')
+                .long("seance"),
+        )
+        .arg(
+            Arg::new("unbury")
+                .about(
+                    "Undo the last removal by the current user, or specify some file(s) in the \
+                   graveyard.  Combine with -s to restore everything printed by -s.",
+                )
+                .short('u')
+                .long("unbury")
+                .value_name("target")
+                .min_values(0),
+        )
+        .arg(
+            Arg::new("inspect")
+                .about("Prints some info about TARGET before prompting for action")
+                .short('i')
+                .long("inspect"),
+        )
+        .subcommand(
+            App::new("completion")
+                .version(crate_version!())
+                .author(crate_authors!())
+                .setting(AppSettings::Hidden)
+                .about("AutoCompletion")
+                .arg(
+                    Arg::new("shell")
+                        .short('s')
+                        .long("shell")
+                        .about("Selects shell")
+                        .required(true)
+                        .takes_value(true)
+                        .possible_values(&["bash", "elvish", "fish", "powershell", "zsh"]),
+                )
+                .arg(
+                    Arg::new("manual")
+                        .short('m')
+                        .long("manual")
+                        .about("Display instructions on how to install autocompletions"),
+                ),
+        )
+}
+
+/// Print completions
+pub fn print_completions<G: Generator>(app: &mut App) {
+    generate::<G, _>(app, app.get_name().to_string(), &mut io::stdout());
 }
 
 /// Write deletion history to record
