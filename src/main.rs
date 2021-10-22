@@ -18,7 +18,8 @@ mod errors {
 }
 use errors::*;
 
-include!("util.rs");
+mod util;
+use util::*;
 
 const GRAVEYARD: &str = "/tmp/graveyard";
 const RECORD: &str = ".record";
