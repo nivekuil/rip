@@ -1,5 +1,9 @@
 /// Concatenate two paths, even if the right argument is an absolute path.
-fn join_absolute<A: AsRef<Path>, B: AsRef<Path>>(left: A, right: B) -> PathBuf {
+use std::path::{PathBuf, Path};
+use std::{env, fs, io};
+use std::io::{BufReader, Read, Write};
+
+pub fn join_absolute<A: AsRef<Path>, B: AsRef<Path>>(left: A, right: B) -> PathBuf {
     let (left, right) = (left.as_ref(), right.as_ref());
     left.join(
         if let Ok(stripped) = right.strip_prefix("/") {
@@ -10,16 +14,16 @@ fn join_absolute<A: AsRef<Path>, B: AsRef<Path>>(left: A, right: B) -> PathBuf {
     )
 }
 
-fn symlink_exists<P: AsRef<Path>>(path: P) -> bool {
+pub fn symlink_exists<P: AsRef<Path>>(path: P) -> bool {
     fs::symlink_metadata(path).is_ok()
 }
 
-fn get_user() -> String {
+pub fn get_user() -> String {
     env::var("USER").unwrap_or_else(|_| String::from("unknown"))
 }
 
 /// Prompt for user input, returning True if the first character is 'y' or 'Y'
-fn prompt_yes<T: AsRef<str>>(prompt: T) -> bool {
+pub fn prompt_yes<T: AsRef<str>>(prompt: T) -> bool {
     print!("{} (y/N) ", prompt.as_ref());
     if io::stdout().flush().is_err() {
         // If stdout wasn't flushed properly, fallback to println
@@ -34,7 +38,7 @@ fn prompt_yes<T: AsRef<str>>(prompt: T) -> bool {
 }
 
 /// Add a numbered extension to duplicate filenames to avoid overwriting files.
-fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
+pub fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
     let grave = grave.as_ref();
     let name = grave.to_str().expect("Filename must be valid unicode.");
     (1_u64..)
@@ -43,7 +47,7 @@ fn rename_grave<G: AsRef<Path>>(grave: G) -> PathBuf {
         .expect("Failed to rename duplicate file or directory")
 }
 
-fn humanize_bytes(bytes: u64) -> String {
+pub fn humanize_bytes(bytes: u64) -> String {
     let values = ["bytes", "KB", "MB", "GB", "TB"];
     let pair = values.iter()
         .enumerate()
