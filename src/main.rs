@@ -4,9 +4,9 @@ extern crate clap;
 extern crate core;
 #[macro_use]
 extern crate error_chain;
-extern crate time;
 extern crate walkdir;
 
+use chrono::Local;
 use clap::{App, Arg};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
@@ -115,7 +115,9 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
             env
         } else {
             format!("{}-{}", GRAVEYARD, get_user())
-        }}.into();
+        }
+    }
+    .into();
 
     if matches.is_present("decompose") {
         if prompt_yes("Really unlink the entire graveyard?") {
@@ -310,7 +312,7 @@ where
     writeln!(
         f,
         "{}\t{}\t{}",
-        time::now().ctime(),
+        Local::now().to_rfc3339(),
         source.display(),
         dest.display()
     )?;

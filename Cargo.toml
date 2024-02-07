@@ -17,8 +17,8 @@ autobins = false
 [dependencies]
 clap = "2"
 walkdir = "1"
-time = "0.1"
 error-chain = "0.12"
+chrono = "0.4.33"
 
 [profile.release]
 opt-level = "s"
