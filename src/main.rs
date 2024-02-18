@@ -4,9 +4,9 @@ extern crate clap;
 extern crate core;
 #[macro_use]
 extern crate error_chain;
-extern crate time;
 extern crate walkdir;
 
+use chrono::Local;
 use clap::{App, Arg};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
@@ -100,6 +100,12 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                 .short("i")
                 .long("inspect"),
         )
+        .arg(
+            Arg::with_name("trash")
+                .help("Put the files or directory into system's trash,supports Windows, macOS, and all FreeDesktop Trash compliant environments (including GNOME, KDE, XFCE, and more).")
+                .short("t")
+                .long("trash"),
+        )
         .get_matches();
 
     let graveyard: &PathBuf = &{
@@ -115,7 +121,9 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
             env
         } else {
             format!("{}-{}", GRAVEYARD, get_user())
-        }}.into();
+        }
+    }
+    .into();
 
     if matches.is_present("decompose") {
         if prompt_yes("Really unlink the entire graveyard?") {
@@ -203,6 +211,12 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                 } else {
                     cwd.join(target)
                 };
+                if matches.is_present("trash") {
+                    match trash::delete(source) {
+                        Ok(_) => continue,
+                        Err(e) => bail!("trash error {} from {}", e, target),
+                    }
+                }
 
                 if matches.is_present("inspect") {
                     if metadata.is_dir() {
@@ -310,7 +324,7 @@ where
     writeln!(
         f,
         "{}\t{}\t{}",
-        time::now().ctime(),
+        Local::now().to_rfc3339(),
         source.display(),
         dest.display()
     )?;
