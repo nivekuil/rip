@@ -19,6 +19,7 @@ clap = "2"
 walkdir = "1"
 error-chain = "0.12"
 chrono = "0.4.33"
+trash = "3.2.1"
 
 [profile.release]
 opt-level = "s"

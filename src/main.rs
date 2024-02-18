@@ -100,6 +100,12 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                 .short("i")
                 .long("inspect"),
         )
+        .arg(
+            Arg::with_name("trash")
+                .help("Put the files or directory into system's trash,supports Windows, macOS, and all FreeDesktop Trash compliant environments (including GNOME, KDE, XFCE, and more).")
+                .short("t")
+                .long("trash"),
+        )
         .get_matches();
 
     let graveyard: &PathBuf = &{
@@ -205,6 +211,12 @@ Send files to the graveyard (/tmp/graveyard-$USER by default) instead of unlinki
                 } else {
                     cwd.join(target)
                 };
+                if matches.is_present("trash") {
+                    match trash::delete(source) {
+                        Ok(_) => continue,
+                        Err(e) => bail!("trash error {} from {}", e, target),
+                    }
+                }
 
                 if matches.is_present("inspect") {
                     if metadata.is_dir() {
